@@ -30,16 +30,20 @@ def rmdir(dir):
         pass
 
 
-def setup_dirs():
+def setup_dirs(algorithm='maml'):
     """Creates directories for this project."""
     mkdir(PATH + '/logs/')
-    mkdir(PATH + '/logs/proto_nets')
-    mkdir(PATH + '/logs/matching_nets')
-    mkdir(PATH + '/logs/maml')
+    mkdir(PATH + f'/logs/{algorithm}')
     mkdir(PATH + '/models/')
-    mkdir(PATH + '/models/proto_nets')
-    mkdir(PATH + '/models/matching_nets')
-    mkdir(PATH + '/models/maml')
+    mkdir(PATH + f'/models/{algorithm}')
+    # mkdir(PATH + '/logs/')
+    # mkdir(PATH + '/logs/proto_nets')
+    # mkdir(PATH + '/logs/matching_nets')
+    # mkdir(PATH + '/logs/maml')
+    # mkdir(PATH + '/models/')
+    # mkdir(PATH + '/models/proto_nets')
+    # mkdir(PATH + '/models/matching_nets')
+    # mkdir(PATH + '/models/maml')
 
 
 def pairwise_distances(x: torch.Tensor,

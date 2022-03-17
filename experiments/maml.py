@@ -15,16 +15,13 @@ from few_shot.utils import setup_dirs
 from config import PATH
 
 
-setup_dirs()
-assert torch.cuda.is_available()
-device = torch.device('cuda')
-torch.backends.cudnn.benchmark = True
-
+setup_dirs('maml')
 
 ##############
 # Parameters #
 ##############
 parser = argparse.ArgumentParser()
+parser.add_argument('--device', default=0)
 parser.add_argument('--dataset')
 parser.add_argument('--n', default=1, type=int)
 parser.add_argument('--k', default=5, type=int)
@@ -40,6 +37,11 @@ parser.add_argument('--epoch-len', default=100, type=int)
 parser.add_argument('--eval-batches', default=20, type=int)
 
 args = parser.parse_args()
+
+assert torch.cuda.is_available()
+torch.cuda.set_device(args.device)
+device = torch.device('cuda')
+torch.backends.cudnn.benchmark = True
 
 if args.dataset == 'omniglot':
     dataset_class = OmniglotDataset

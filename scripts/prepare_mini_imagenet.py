@@ -7,6 +7,9 @@ given in data/mini_imagenet.txt which is downloaded from the link provided in th
 1. Download files from https://drive.google.com/file/d/0B3Irx3uQNoBMQ1FlNXJsZUdYWEE/view and place in
     data/miniImageNet/images
 2. Run the script
+
+since the above website needs visiting permissions, I obtained from another source: mini_imagenet_full_size.tar.bz2
+after unzip it and we get mini_imagenet_full_size folder which contain test/train/val.
 """
 from tqdm import tqdm as tqdm
 import numpy as np
@@ -24,8 +27,13 @@ mkdir(DATA_PATH + '/miniImageNet/images_background')
 mkdir(DATA_PATH + '/miniImageNet/images_evaluation')
 
 # Find class identities
+# classes = []
+# for root, _, files in os.walk(DATA_PATH + '/miniImageNet/images/'):
+#     for f in files:
+#         if f.endswith('.jpg'):
+#             classes.append(f[:-12])
 classes = []
-for root, _, files in os.walk(DATA_PATH + '/miniImageNet/images/'):
+for root, _, files in os.walk(DATA_PATH + '/mini_imagenet_full_size/'):
     for f in files:
         if f.endswith('.jpg'):
             classes.append(f[:-12])
@@ -45,8 +53,18 @@ for c in evaluation_classes:
     mkdir(DATA_PATH + f'/miniImageNet/images_evaluation/{c}/')
 
 # Move images to correct location
-for root, _, files in os.walk(DATA_PATH + '/miniImageNet/images'):
-    for f in tqdm(files, total=600*100):
+# for root, _, files in os.walk(DATA_PATH + '/miniImageNet/images'):
+#     for f in tqdm(files, total=600*100):
+#         if f.endswith('.jpg'):
+#             class_name = f[:-12]
+#             image_name = f[-12:]
+#             # Send to correct folder
+#             subset_folder = 'images_evaluation' if class_name in evaluation_classes else 'images_background'
+#             src = f'{root}/{f}'
+#             dst = DATA_PATH + f'/miniImageNet/{subset_folder}/{class_name}/{image_name}'
+#             shutil.copy(src, dst)
+for root, _, files in os.walk(DATA_PATH + '/mini_imagenet_full_size'):
+    for f in tqdm(files):
         if f.endswith('.jpg'):
             class_name = f[:-12]
             image_name = f[-12:]
