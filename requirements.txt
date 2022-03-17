@@ -49,7 +49,7 @@ pytz==2018.7
 PyWavelets==1.0.1
 pyzmq==17.1.2
 qtconsole==4.4.2
-scikit-image==0.14.2
+scikit-image
 scipy==1.1.0
 Send2Trash==1.5.0
 six==1.11.0
