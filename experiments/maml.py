@@ -39,7 +39,7 @@ parser.add_argument('--eval-batches', default=20, type=int)
 args = parser.parse_args()
 
 assert torch.cuda.is_available()
-torch.cuda.set_device(args.device)
+torch.cuda.set_device(int(args.device))
 device = torch.device('cuda')
 torch.backends.cudnn.benchmark = True
 
