@@ -135,6 +135,23 @@ class FewShotClassifier(nn.Module):
 
         return x
 
+    def obtain_final_layer_size(self, img_size):
+        """
+            forward zero tensor to 4 conv layers and view and get final_layer_size.
+            img_size:28 -> [1, 64, 14, 14] -> [1, 64, 7, 7]   -> [1, 64, 3, 3]   -> [1, 64, 1, 1] -> [1, 64]
+            img_size:48 -> [1, 64, 24, 24] -> [1, 64, 12, 12] -> [1, 64, 6, 6]   -> [1, 64, 3, 3] -> [1, 576]
+            img_size:84 -> [1, 64, 42, 42] -> [1, 64, 21, 21] -> [1, 64, 10, 10] -> [1, 64, 5, 5] -> [1, 1600]
+        """
+        x = torch.zeros(1, 3, img_size, img_size).to(self.logits.weight.device)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+
+        x = x.view(x.size(0), -1)
+
+        return x.size(1)
+
 
 class MatchingNetwork(nn.Module):
     def __init__(self, n: int, k: int, q: int, fce: bool, num_input_channels: int,

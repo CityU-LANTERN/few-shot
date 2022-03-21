@@ -30,12 +30,11 @@ def rmdir(dir):
         pass
 
 
-def setup_dirs(algorithm='maml'):
+def setup_dirs(exper_name='maml'):
     """Creates directories for this project."""
-    mkdir(PATH + '/logs/')
-    mkdir(PATH + f'/logs/{algorithm}')
-    mkdir(PATH + '/models/')
-    mkdir(PATH + f'/models/{algorithm}')
+    mkdir(os.path.join(PATH, exper_name))
+    mkdir(os.path.join(PATH, exper_name, 'logs'))
+    mkdir(os.path.join(PATH, exper_name, 'models'))
     # mkdir(PATH + '/logs/')
     # mkdir(PATH + '/logs/proto_nets')
     # mkdir(PATH + '/logs/matching_nets')

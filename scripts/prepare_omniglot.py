@@ -22,7 +22,7 @@ from few_shot.utils import mkdir, rmdir
 # Parameters
 dataset_zip_files = ['images_background.zip', 'images_evaluation.zip']
 raw_omniglot_location = DATA_PATH + '/Omniglot_Raw/'
-prepared_omniglot_location = DATA_PATH + '/Omniglot/'
+prepared_omniglot_location = DATA_PATH + '/Omniglot_enriched/'
 output_shape = (28, 28)
 
 

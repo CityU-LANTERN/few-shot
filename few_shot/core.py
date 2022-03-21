@@ -81,6 +81,9 @@ class NShotTaskSampler(Sampler):
                     for i, q in query.iterrows():
                         batch.append(q['id'])
 
+            # yield the indexs of (img,label) samples for a batch
+            # batch contain id in df, total size (n*k + q*k)
+            # then using this id as the items in Dataset.__getitem__
             yield np.stack(batch)
 
 
