@@ -15,6 +15,8 @@ from few_shot.utils import setup_dirs
 from config import PATH
 
 
+setup_dirs()
+
 ##############
 # Parameters #
 ##############
@@ -55,8 +57,6 @@ else:
 param_str = f'{args.dataset}_order={args.order}_n={args.n}_k={args.k}_metabatch={args.meta_batch_size}_' \
             f'train_steps={args.inner_train_steps}_val_steps={args.inner_val_steps}'
 print(param_str)
-
-setup_dirs(exper_name=param_str)
 
 
 ###################

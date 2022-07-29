@@ -9,6 +9,8 @@ import numpy as np
 import os
 from typing import List, Dict
 
+import sys
+sys.path.append("..")
 from config import DATA_PATH
 
 
@@ -225,7 +227,9 @@ class MiniImageNet(Dataset):
 
 class Meta(Dataset):
     def __init__(self, subset, target):
-        """Dataset class representing CUB_Bird/DTD_Texture/FGVC_Aircraft/FGVCx_Fungi dataset
+        """Dataset class for regular train/val/test,
+        background -> train
+        evaluation -> test
 
         # Arguments:
             subset: Whether the dataset represents the background or evaluation set
@@ -233,8 +237,8 @@ class Meta(Dataset):
         """
         if subset not in ('background', 'evaluation'):
             raise(ValueError, 'subset must be one of (background, evaluation)')
-        if target not in ('CUB_Bird', 'DTD_Texture', 'FGVC_Aircraft', 'FGVCx_Fungi'):
-            raise(ValueError, 'target must be one of (CUB_Bird, DTD_Texture, FGVC_Aircraft, FGVCx_Fungi)')
+        # if target not in ('CUB_Bird', 'DTD_Texture', 'FGVC_Aircraft', 'FGVCx_Fungi'):
+        #     raise(ValueError, 'target must be one of (CUB_Bird, DTD_Texture, FGVC_Aircraft, FGVCx_Fungi)')
         self.subset = subset
         self.target = target
 
@@ -296,21 +300,34 @@ class Meta(Dataset):
         """
         images = []
         print('Indexing {}...{}...'.format(target, subset))
-        folder_name = 'train' if subset == 'background' else 'val'
         # Quick first pass to find total for tqdm bar
         subset_len = 0
-        for root, folders, files in os.walk(DATA_PATH + '/meta-dataset/{}/{}'.format(target, folder_name)):
-            subset_len += len([f for f in files if f.endswith('.jpg')])
+
+        # determine target's path
+        folder_name = 'train' if subset == 'background' else 'test'
+        if target in ('CUB_Bird', 'DTD_Texture', 'FGVC_Aircraft', 'FGVCx_Fungi'):
+            target_path = DATA_PATH + '/meta-dataset/{}/{}'.format(target, folder_name)
+        elif target in ('clipart_84', 'infograph_84', 'painting_84', 'quickdraw_84', 'real_84', 'sketch_84'):
+            target_path = DATA_PATH + '/DomainNet/{}/{}'.format(target, folder_name)
+        else:
+            target_path = DATA_PATH + '/{}/{}'.format(target, folder_name)
+        print('target_path: {}'.format(target_path))
+
+        for root, folders, files in os.walk(target_path):
+            subset_len += len([f for f in files if f.endswith('.jpg') or f.endswith('.JPG')])
+        if subset_len == 0:
+            raise Exception('image file not ended with jpg.')
+        print('find {} images.'.format(subset_len))
 
         progress_bar = tqdm(total=subset_len)
-        for root, folders, files in os.walk(DATA_PATH + '/meta-dataset/{}/{}'.format(target, folder_name)):
+        for root, folders, files in os.walk(target_path):
             if len(files) == 0:
                 continue
 
             class_name = root.split(os.sep)[-1]     # linux / ; windows \\
             # 014.Indigo_Bunting
 
-            for f in files:
+            for f in [f for f in files if f.endswith('.jpg') or f.endswith('.JPG')]:
                 progress_bar.update(1)
                 images.append({
                     'subset': subset,
@@ -363,6 +380,29 @@ class MultiDataset(Dataset):
         self.dataset_list = dataset_list
         self.datasetid_to_class_id = self.label_mapping()
 
+        # cat all df in dataset_list
+        # e.g., CUB Bird
+        #   class_name            filepath    subset    id   class_id         {Bird: 960}
+        # 0  014.Indigo_Bunting              ...         0          0
+        # 1  014.Indigo_Bunting              ...         1          0
+        # 2  014.Indigo_Bunting              ...         2          0
+        # 3  014.Indigo_Bunting              ...         3          0
+        # 4  014.Indigo_Bunting              ...         4          0
+        self.df = pd.concat([dataset.df for dataset in dataset_list], keys=[dataset.target for dataset in dataset_list])
+        # update id with offset
+        self.df['id'] = range(len(self.df))
+        # update class_id with datasetid_to_class_id
+        self.df = self.df.assign(class_id=self.df['id'].apply(lambda c: self.datasetid_to_class_id[c]))
+        #               class_name   ...    id  class_id
+        # CIFAR100_84 0       crab   ...     0         0
+        #             1       crab   ...     1         0
+        #             2       crab   ...     2         0
+        #             3       crab   ...     3         0
+        #             4       crab   ...     4         0
+        # ...
+        # CIFAR10_84  0       bird   ...   100         1
+        #             1       bird   ...   101         1
+
     def index_mapping(self, index) -> (int, int):
         """
         A mapping method to map index (in __getitem__ method) to the index in the corresponding dataset.
@@ -370,14 +410,14 @@ class MultiDataset(Dataset):
         :param index:
         :return: dataset_id, item
         """
-
+        index_origin = index
         for dataset_id, dataset in enumerate(self.dataset_list):
             if index < len(dataset):
                 return dataset_id, index
             else:
                 index = index - len(dataset)
 
-        raise(ValueError, f'index exceeds total number of instances, index {index}')
+        raise(ValueError, f'index exceeds total number of instances, index {index_origin}')
 
     def label_mapping(self) -> Dict:
         """
@@ -413,9 +453,20 @@ class MultiDataset(Dataset):
 
 if __name__ == "__main__":
     # debug on MultiDataset
-    evaluation = MultiDataset([Meta('evaluation', 'CUB_Bird'),
-                               Meta('evaluation', 'DTD_Texture'),
-                               Meta('evaluation', 'FGVC_Aircraft')])
+    evaluation = MultiDataset([Meta('evaluation', 'CUB_Bird'), Meta('evaluation', 'FGVC_Aircraft')])
 
-    #
     print(evaluation[1000][0].shape, evaluation[1000][1])
+    # Indexing CUB_Bird...evaluation...
+    # 1220it [00:00, 19339.69it/s]
+    # Indexing DTD_Texture...evaluation...
+    # 1209it [00:00, 22444.32it/s]
+    # Indexing FGVC_Aircraft...evaluation...
+    # 2020it [00:00, 23293.17it/s]
+    # torch.Size([3, 84, 84]) 15
+
+    # print(evaluation.df)
+    from matplotlib import pyplot as plt
+    plt.imshow(np.transpose(evaluation[0][0].numpy(), (1, 2, 0)))
+    plt.show()
+    plt.imshow(np.transpose(evaluation[3000][0].numpy(), (1, 2, 0)))
+    plt.show()

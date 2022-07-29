@@ -5,7 +5,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 import argparse
 
-from few_shot.datasets import OmniglotDataset, MiniImageNet
+from few_shot.datasets import OmniglotDataset, MiniImageNet, MultiDataset, Meta
 from few_shot.models import get_few_shot_encoder
 from few_shot.core import NShotTaskSampler, EvaluateFewShot, prepare_nshot_task
 from few_shot.proto import proto_net_episode
@@ -16,15 +16,12 @@ from config import PATH
 
 
 setup_dirs()
-assert torch.cuda.is_available()
-device = torch.device('cuda')
-torch.backends.cudnn.benchmark = True
-
 
 ##############
 # Parameters #
 ##############
 parser = argparse.ArgumentParser()
+parser.add_argument('--device', default=0)
 parser.add_argument('--dataset')
 parser.add_argument('--distance', default='l2')
 parser.add_argument('--n-train', default=1, type=int)
@@ -33,7 +30,13 @@ parser.add_argument('--k-train', default=60, type=int)
 parser.add_argument('--k-test', default=5, type=int)
 parser.add_argument('--q-train', default=5, type=int)
 parser.add_argument('--q-test', default=1, type=int)
+
 args = parser.parse_args()
+
+assert torch.cuda.is_available()
+torch.cuda.set_device(int(args.device))
+device = torch.device('cuda')
+torch.backends.cudnn.benchmark = True
 
 evaluation_episodes = 1000
 episodes_per_epoch = 100
@@ -48,6 +51,11 @@ elif args.dataset == 'miniImageNet':
     dataset_class = MiniImageNet
     num_input_channels = 3
     drop_lr_every = 40
+elif args.dataset == 'BTAF':
+    n_epochs = 100
+    dataset_class = MultiDataset
+    num_input_channels = 3
+    drop_lr_every = 40
 else:
     raise(ValueError, 'Unsupported dataset')
 
@@ -59,13 +67,27 @@ print(param_str)
 ###################
 # Create datasets #
 ###################
-background = dataset_class('background')
+
+if args.dataset == 'BTAF':
+    background = dataset_class([Meta('background', 'CUB_Bird'),
+                                Meta('background', 'DTD_Texture'),
+                                Meta('background', 'FGVC_Aircraft'),
+                                Meta('background', 'FGVCx_Fungi')])
+else:
+    background = dataset_class('background')
 background_taskloader = DataLoader(
     background,
     batch_sampler=NShotTaskSampler(background, episodes_per_epoch, args.n_train, args.k_train, args.q_train),
     num_workers=4
 )
-evaluation = dataset_class('evaluation')
+
+if args.dataset == 'BTAF':
+    evaluation = dataset_class([Meta('evaluation', 'CUB_Bird'),
+                                Meta('evaluation', 'DTD_Texture'),
+                                Meta('evaluation', 'FGVC_Aircraft'),
+                                Meta('evaluation', 'FGVCx_Fungi')])
+else:
+    evaluation = dataset_class('evaluation')
 evaluation_taskloader = DataLoader(
     evaluation,
     batch_sampler=NShotTaskSampler(evaluation, episodes_per_epoch, args.n_test, args.k_test, args.q_test),

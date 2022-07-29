@@ -1,5 +1,111 @@
-# reproduction: 2nd order MAML
-python -m experiments.maml --device 1 --dataset omniglot --order 2 --n 1 --k 5 --eval-batches 10 --epoch-len 50
+#!/bin/sh
 
-python -m experiments.maml --device 2 --dataset miniImageNet --order 2 --n 1 --k 5 --q 5 --meta-batch-size 4 \
-    --inner-train-steps 5 --inner-val-steps 10 --inner-lr 0.01 --eval-batches 80 --epoch-len 400
+## proto_nets, BTAF
+# train
+# python -m experiments.proto_nets --dataset BTAF --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+
+# test
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset Omniglot_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on Omniglot_84...
+val_categorical_accuracies: [0.56, 0.554, 0.568, 0.548, 0.552, 0.56, 0.576, 0.57, 0.578, 0.554, 0.542, 0.576, 0.586, 0.556, 0.548, 0.584, 0.598, 0.562, 0.56, 0.582]
+mean accuracy: 0.5657000000000001, std: 0.014659809002848537
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset FGVC_Aircraft --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on FGVC_Aircraft...
+val_categorical_accuracies: [0.42, 0.396, 0.404, 0.446, 0.436, 0.444, 0.408, 0.392, 0.438, 0.408, 0.384, 0.432, 0.416, 0.424, 0.396, 0.434, 0.406, 0.4, 0.428, 0.426]
+mean accuracy: 0.41689999999999994, std: 0.018005277004256273
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset CUB_Bird --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on CUB_Bird...
+val_categorical_accuracies: [0.524, 0.51, 0.516, 0.498, 0.48, 0.546, 0.49, 0.516, 0.506, 0.55, 0.528, 0.486, 0.468, 0.498, 0.488, 0.522, 0.476, 0.508, 0.516, 0.52]
+mean accuracy: 0.5073, std: 0.02145949673221627
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset DTD_Texture --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on DTD_Texture...
+val_categorical_accuracies: [0.352, 0.288, 0.344, 0.296, 0.304, 0.328, 0.302, 0.32, 0.322, 0.296, 0.34, 0.338, 0.32, 0.274, 0.33, 0.282, 0.288, 0.306, 0.304, 0.314]
+mean accuracy: 0.3124, std: 0.02140654105641545
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset FGVCx_Fungi --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on FGVCx_Fungi...
+val_categorical_accuracies: [0.344, 0.366, 0.36, 0.346, 0.332, 0.39, 0.352, 0.346, 0.368, 0.342, 0.362, 0.366, 0.352, 0.378, 0.374, 0.36, 0.374, 0.366, 0.364, 0.368]
+mean accuracy: 0.36049999999999993, std: 0.013694889557787608
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset VGG_Flower_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on VGG_Flower_84...
+val_categorical_accuracies: [0.612, 0.604, 0.596, 0.632, 0.602, 0.592, 0.556, 0.56, 0.612, 0.548, 0.618, 0.576, 0.606, 0.594, 0.628, 0.548, 0.602, 0.592, 0.566, 0.59]
+mean accuracy: 0.5917000000000001, std: 0.024554225705568467
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset traffic_sign_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on traffic_sign_84...
+val_categorical_accuracies: [0.414, 0.398, 0.402, 0.4, 0.418, 0.386, 0.39, 0.394, 0.368, 0.42, 0.41, 0.394, 0.394, 0.39, 0.386, 0.404, 0.34, 0.402, 0.398, 0.386]
+mean accuracy: 0.3947, std: 0.017335224255832393
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset mscoco_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on mscoco_84...
+val_categorical_accuracies: [0.336, 0.364, 0.326, 0.338, 0.318, 0.308, 0.324, 0.324, 0.338, 0.314, 0.338, 0.342, 0.368, 0.314, 0.336, 0.324, 0.334, 0.346, 0.304, 0.32]
+mean accuracy: 0.3308, std: 0.016289874155437787
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset mini_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on mini_84...
+val_categorical_accuracies: [0.36, 0.328, 0.34, 0.354, 0.34, 0.342, 0.35, 0.37, 0.356, 0.364, 0.324, 0.324, 0.372, 0.368, 0.348, 0.366, 0.358, 0.36, 0.356, 0.37]
+mean accuracy: 0.3525, std: 0.014817219712213212
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset clipart_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on clipart_84...
+val_categorical_accuracies: [0.338, 0.322, 0.298, 0.33, 0.31, 0.328, 0.314, 0.326, 0.342, 0.326, 0.342, 0.312, 0.324, 0.332, 0.308, 0.334, 0.326, 0.332, 0.304, 0.34]
+mean accuracy: 0.32439999999999997, std: 0.012579348154813121
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset infograph_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on infograph_84...
+val_categorical_accuracies: [0.234, 0.252, 0.262, 0.248, 0.242, 0.224, 0.254, 0.24, 0.242, 0.23, 0.254, 0.256, 0.262, 0.238, 0.222, 0.212, 0.236, 0.264, 0.22, 0.25]
+mean accuracy: 0.24209999999999998, std: 0.014730580436629104
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset painting_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on painting_84...
+val_categorical_accuracies: [0.324, 0.294, 0.324, 0.312, 0.316, 0.286, 0.286, 0.316, 0.33, 0.306, 0.302, 0.296, 0.262, 0.314, 0.276, 0.32, 0.29, 0.296, 0.308, 0.308]
+mean accuracy: 0.3033, std: 0.017079519899575634
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset quickdraw_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on quickdraw_84...
+val_categorical_accuracies: [0.5, 0.494, 0.468, 0.472, 0.468, 0.488, 0.484, 0.456, 0.48, 0.488, 0.496, 0.49, 0.452, 0.502, 0.494, 0.488, 0.502, 0.464, 0.472, 0.508]
+mean accuracy: 0.4833, std: 0.015687893421361575
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset real_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on real_84...
+val_categorical_accuracies: [0.392, 0.36, 0.406, 0.404, 0.34, 0.384, 0.394, 0.364, 0.374, 0.392, 0.412, 0.356, 0.39, 0.362, 0.364, 0.336, 0.418, 0.366, 0.358, 0.394]
+mean accuracy: 0.37829999999999997, std: 0.022937087870956944
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset sketch_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on sketch_84...
+val_categorical_accuracies: [0.258, 0.276, 0.322, 0.262, 0.264, 0.288, 0.284, 0.278, 0.276, 0.25, 0.266, 0.274, 0.288, 0.266, 0.256, 0.29, 0.266, 0.264, 0.28, 0.272]
+mean accuracy: 0.2740000000000001, std: 0.01550483795465144
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset CIFAR10_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on CIFAR10_84...
+val_categorical_accuracies: [0.34, 0.352, 0.32, 0.354, 0.36, 0.3, 0.358, 0.318, 0.308, 0.328, 0.358, 0.316, 0.348, 0.342, 0.378, 0.36, 0.342, 0.32, 0.334, 0.316]
+mean accuracy: 0.33759999999999996, std: 0.020529003872570138
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset CIFAR100_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on CIFAR100_84...
+val_categorical_accuracies: [0.406, 0.406, 0.364, 0.422, 0.416, 0.414, 0.344, 0.402, 0.408, 0.352, 0.358, 0.372, 0.422, 0.364, 0.364, 0.382, 0.39, 0.394, 0.39, 0.382]
+mean accuracy: 0.38759999999999994, std: 0.023711600536446293
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset cars_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on cars_84...
+val_categorical_accuracies: [0.322, 0.294, 0.31, 0.316, 0.282, 0.31, 0.32, 0.314, 0.286, 0.3, 0.342, 0.362, 0.3, 0.334, 0.332, 0.302, 0.284, 0.328, 0.292, 0.31]
+mean accuracy: 0.31199999999999994, std: 0.020258331619360973
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset pets_head_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on pets_head_84...
+val_categorical_accuracies: [0.424, 0.422, 0.412, 0.426, 0.436, 0.408, 0.446, 0.44, 0.41, 0.404, 0.42, 0.432, 0.448, 0.448, 0.442, 0.438, 0.418, 0.412, 0.458, 0.4]
+mean accuracy: 0.4272, std: 0.016351146748775764
+
+python -m experiments.proto_nets_test --dataset BTAF --test-dataset dogs_84 --k-test 5 --n-test 1 --k-train 20 --n-train 1 --q-train 15
+Testing Prototypical network on dogs_84...
+val_categorical_accuracies: [0.37, 0.354, 0.398, 0.358, 0.366, 0.36, 0.344, 0.344, 0.368, 0.32, 0.342, 0.336, 0.322, 0.372, 0.362, 0.336, 0.354, 0.4, 0.408, 0.35]
+mean accuracy: 0.3582, std: 0.023280034364235806
+
+average ID: mean 0.399275 ; std 0.009654629718430428
+average OOD: mean 0.3789625 ; std 0.004247628014551167
+average: mean 0.38302499999999995; std 0.003774370
+

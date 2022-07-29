@@ -174,9 +174,11 @@ def prepare_nshot_task(n: int, k: int, q: int) -> Callable:
         TODO: Move to arbitrary device
         """
         x, y = batch
+        # print(f'prepare_batch: x: {x.shape}, y: {y.shape}')
         x = x.double().cuda()
         # Create dummy 0-(num_classes - 1) label
         y = create_nshot_task_label(k, q).cuda()
+        # print(f'prepare_batch: y: {y}')
         return x, y
 
     return prepare_nshot_task_

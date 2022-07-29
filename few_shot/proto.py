@@ -43,6 +43,7 @@ def proto_net_episode(model: Module,
 
     # Embed all samples
     embeddings = model(x)
+    # print(f'embeddings: {embeddings.shape}')
 
     # Samples are ordered by the NShotWrapper class as follows:
     # k lots of n support samples from a particular class
@@ -53,7 +54,9 @@ def proto_net_episode(model: Module,
 
     # Calculate squared distances between all queries and all prototypes
     # Output should have shape (q_queries * k_way, k_way) = (num_queries, k_way)
+    # print(f'queries: {queries.shape}, prototypes: {prototypes.shape}, distances: {distance}')
     distances = pairwise_distances(queries, prototypes, distance)
+    # print(f'distances: {distances.shape}')
 
     # Calculate log p_{phi} (y = k | x)
     log_p_y = (-distances).log_softmax(dim=1)
@@ -61,6 +64,7 @@ def proto_net_episode(model: Module,
 
     # Prediction probabilities are softmax over distances
     y_pred = (-distances).softmax(dim=1)
+    # print(f'y_pred: {y_pred.shape}')
 
     if train:
         # Take gradient step
@@ -68,8 +72,10 @@ def proto_net_episode(model: Module,
         optimiser.step()
     else:
         pass
-
-    return loss, y_pred
+    if train:
+        return loss, y_pred
+    else:
+        return y_pred
 
 
 def compute_prototypes(support: torch.Tensor, k: int, n: int) -> torch.Tensor:
