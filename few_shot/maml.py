@@ -91,17 +91,18 @@ def meta_gradient_step(model: Module,
         # y = create_nshot_task_label(k_way, q_queries).to(device)
         logits = model.functional_forward(x_task_val, fast_weights)    # [15,5]  [5-way*3-quer, 5-way]
         loss = loss_fn(logits, y_que)
-        loss.backward(retain_graph=True)
 
         # Get post-update accuracies
-        y_pred = logits.softmax(dim=1)           # [15,5]  [5-way*3-quer, 5-way]
+        y_pred = logits.softmax(dim=1).cpu().detach()           # [15,5]  [5-way*3-quer, 5-way]
         task_predictions.append(y_pred)
 
         # Accumulate losses and gradients
         task_losses.append(loss)
-        gradients = torch.autograd.grad(loss, fast_weights.values(), create_graph=create_graph)
-        named_grads = {name: g for ((name, _), g) in zip(fast_weights.items(), gradients)}
-        task_gradients.append(named_grads)
+        if order == 1:
+            loss.backward(retain_graph=True)
+            gradients = torch.autograd.grad(loss, fast_weights.values(), create_graph=create_graph)
+            named_grads = {name: g for ((name, _), g) in zip(fast_weights.items(), gradients)}
+            task_gradients.append(named_grads)
 
     if order == 1:
         if train:
@@ -117,7 +118,7 @@ def meta_gradient_step(model: Module,
             optimiser.zero_grad()
             # Dummy pass in order to create `loss` variable
             # Replace dummy gradients with mean task gradients using hooks
-            logits = model(torch.zeros((k_way,) + data_shape).to(device, dtype=torch.double))
+            logits = model(torch.zeros((k_way,) + data_shape).to(device, dtype=torch.double))  # float?
             loss = loss_fn(logits, y_od1)
             if backward:
                 loss.backward()

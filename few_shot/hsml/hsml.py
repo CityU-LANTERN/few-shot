@@ -155,9 +155,9 @@ class HSML(nn.Module):
 
             assert y_support_set_dup.shape == (s+kq, n, s)
 
-            x_support_set_dup = x_support_set_dup.double().to(device=self.device)
+            x_support_set_dup = x_support_set_dup.float().to(device=self.device)
             if self.is_regression:
-                y_support_set_dup = torch.Tensor(y_support_set_dup).double().to(device=self.device)
+                y_support_set_dup = torch.Tensor(y_support_set_dup).float().to(device=self.device)
             else:
                 y_support_set_dup = torch.Tensor(y_support_set_dup).long().to(device=self.device)
 
@@ -1053,9 +1053,9 @@ class HSML(nn.Module):
             #     lam = self.pool_rng.beta(a=2, b=5, size=1)[0]
             # lam = self.pool_rng.beta(a=self.args.mixup_alpha, b=self.args.mixup_beta, size=1)[0]
             if mix_id == 0:
-                lam = torch.from_numpy(self.pool_rng.beta(a=5, b=2, size=task_embs.shape[-1])).double().to(self.device)     # 128
+                lam = torch.from_numpy(self.pool_rng.beta(a=5, b=2, size=task_embs.shape[-1])).float().to(self.device)     # 128
             else:
-                lam = torch.from_numpy(self.pool_rng.beta(a=2, b=5, size=task_embs.shape[-1])).double().to(self.device)     # 128
+                lam = torch.from_numpy(self.pool_rng.beta(a=2, b=5, size=task_embs.shape[-1])).float().to(self.device)     # 128
 
             mix_task_embs = (lam*task_embs[0]+(1-lam)*task_embs[1]).unsqueeze(0)    # [1, 128]
 
@@ -1096,13 +1096,13 @@ class HSML(nn.Module):
                     self.pool_rng.beta(
                         a=5, b=2,
                         size=(n, shot))
-                ).double().to(self.device)     # [5,1]
+                ).float().to(self.device)     # [5,1]
             else:
                 lam = torch.from_numpy(
                     self.pool_rng.beta(
                         a=2, b=5,
                         size=(n, shot))
-                ).double().to(self.device)
+                ).float().to(self.device)
 
             # for each image
             x_support_set_t, y_support_set_t = \
@@ -1173,13 +1173,13 @@ class HSML(nn.Module):
                     self.pool_rng.beta(
                         a=5, b=2,
                         size=(n, shot))
-                ).double().to(self.device)     # [5,1]
+                ).float().to(self.device)     # [5,1]
             else:
                 lam = torch.from_numpy(
                     self.pool_rng.beta(
                         a=2, b=5,
                         size=(n, shot))
-                ).double().to(self.device)
+                ).float().to(self.device)
 
             # for each image
             x_support_set_t, y_support_set_t = \
@@ -1259,13 +1259,13 @@ class HSML(nn.Module):
                     self.pool_rng.beta(
                         a=5, b=2,
                         size=(n, shot))
-                ).double().to(self.device)     # [5,1]
+                ).float().to(self.device)     # [5,1]
             else:
                 lam = torch.from_numpy(
                     self.pool_rng.beta(
                         a=2, b=5,
                         size=(n, shot))
-                ).double().to(self.device)
+                ).float().to(self.device)
 
 
             # for each image
@@ -1397,7 +1397,7 @@ class HSML(nn.Module):
             prefixed_losses = dict()
 
         for key in losses:
-            prefixed_losses["{}_{}".format(prefix, key)] = losses[key]
+            prefixed_losses["{}_{}".format(prefix, key)] = losses[key]     # .item()
 
         return prefixed_losses
 
@@ -1458,9 +1458,9 @@ class HSML(nn.Module):
                                     self.args.num_classes_per_set)
 
             acc = torch.eq(
-                y_pred.argmax(dim=-1),
-                self.q_relative_labels.repeat(batch_size).reshape(batch_size, -1)
-            ).sum(dim=1).detach().cpu().numpy() / y_pred.shape[1]    # acc [bs, ]
+                y_pred.argmax(dim=-1).cpu(),
+                self.q_relative_labels.cpu().repeat(batch_size).reshape(batch_size, -1)
+            ).sum(dim=1).detach().numpy() / y_pred.shape[1]    # acc [bs, ]
             losses = self.get_across_task_loss_metrics(total_losses=loss, total_accuracies=acc)
             per_task_target_preds = y_pred
 
@@ -1489,9 +1489,9 @@ class HSML(nn.Module):
                                     self.args.num_classes_per_set)
 
             acc = torch.eq(
-                y_pred.argmax(dim=-1),
-                self.q_relative_labels.repeat(batch_size).reshape(batch_size, -1)
-            ).sum(dim=1).detach().cpu().numpy() / y_pred.shape[1]    # acc [bs, ]
+                y_pred.argmax(dim=-1).cpu(),
+                self.q_relative_labels.cpu().repeat(batch_size).reshape(batch_size, -1)
+            ).sum(dim=1).detach().numpy() / y_pred.shape[1]    # acc [bs, ]
             losses = self.get_across_task_loss_metrics(total_losses=loss, total_accuracies=acc)
             per_task_target_preds = y_pred
 
@@ -1499,7 +1499,7 @@ class HSML(nn.Module):
             for aw_idx, adapted_weights in enumerate(adapted_weights_batch):
                 ## adapted_weights_batch to numpy
                 adapted_weights_batch[aw_idx] = {
-                    key: item.detach().cpu().numpy() for (key, item) in adapted_weights.items()
+                    key: item.cpu().detach().numpy() for (key, item) in adapted_weights.items()
                 }
         else:
             adapted_weights_batch = []
@@ -1598,21 +1598,21 @@ class HSML(nn.Module):
                 # loss [bs,]; y_pred [bs, s-way*q_query, s-way]
 
             acc = torch.eq(
-                y_pred.argmax(dim=-1),
-                self.q_relative_labels.repeat(num_obj).reshape(num_obj, -1)
-            ).sum(dim=1).detach().cpu().numpy() / y_pred.shape[1]       # acc [num_obj, ]
+                y_pred.argmax(dim=-1).cpu(),
+                self.q_relative_labels.cpu().repeat(num_obj).reshape(num_obj, -1)
+            ).sum(dim=1).detach().numpy() / y_pred.shape[1]       # acc [num_obj, ]
             indi_losses = self.get_across_task_loss_metrics(total_losses=loss, total_accuracies=acc)
 
-            if val:
+            if val or not self.args.use_conflict_loss:
                 # detach loss here
                 for key, item in indi_losses.items():
                     if type(item) is torch.Tensor:
-                        indi_losses[key] = item.detach().cpu()
+                        indi_losses[key] = item.cpu().detach()
 
             losses_list.append(indi_losses)
 
             if medium_record:
-                adapted_weights_t = {key: item.detach().cpu().numpy() for (key, item) in adapted_weights.items()}
+                adapted_weights_t = {key: item.cpu().detach().numpy() for (key, item) in adapted_weights.items()}
                 adapted_weights_batch_np.append(adapted_weights_t)
 
         losses = self.get_accross_indi_loss_metrics(losses_list)  # after that, this losses['loss'] is np.
@@ -1767,8 +1767,7 @@ class HSML(nn.Module):
                 self.taskSpecificNet.structurize_clustering_information(medium_batch['assigns'], medium_batch['gates'])
 
         # put the data_batch into the pool
-        if hasattr(self.args, "use_pool") and self.args.use_pool:
-            # and self.trained_iterations % 10 == 0
+        if hasattr(self.args, "use_pool") and self.args.use_pool and self.trained_iterations % 10 == 0:
             # 10 for train
             data_batch_cpu = (data_batch_cuda[0].to('cpu'), data_batch_cuda[1].to('cpu'),
                               data_batch_cuda[2].to('cpu'), data_batch_cuda[3].to('cpu'))
@@ -1783,7 +1782,7 @@ class HSML(nn.Module):
         # if available conflict losses calculation
         cal_conflict_matrix_flag = pool_flag and epoch >= self.args.pool_start_epoch
 
-        if cal_conflict_matrix_flag:
+        if hasattr(self.args, "use_pool") and self.args.use_pool and cal_conflict_matrix_flag:
             # and self.trained_iterations % 10 == 0
             for_augment = self.args.use_augment if hasattr(self.args, "use_augment") else False
 
@@ -1792,11 +1791,11 @@ class HSML(nn.Module):
 
             x_support_set, x_target_set, y_support_set, y_target_set = structured_sampled_data_batch
 
-            x_support_set = x_support_set.double().to(device=self.device)
-            x_target_set = x_target_set.double().to(device=self.device)
+            x_support_set = torch.Tensor(x_support_set).float().to(device=self.device)
+            x_target_set = torch.Tensor(x_target_set).float().to(device=self.device)
             if hasattr(self.args, "is_regression") and self.args.is_regression:
-                y_support_set = torch.Tensor(y_support_set).double().to(device=self.device)
-                y_target_set = torch.Tensor(y_target_set).double().to(device=self.device)
+                y_support_set = torch.Tensor(y_support_set).float().to(device=self.device)
+                y_target_set = torch.Tensor(y_target_set).float().to(device=self.device)
             else:
                 y_support_set = torch.Tensor(y_support_set).long().to(device=self.device)
                 y_target_set = torch.Tensor(y_target_set).long().to(device=self.device)
@@ -1930,7 +1929,7 @@ class HSML(nn.Module):
         #     'assigns': assigns, 'gates': gates, 'cluster_idxs': cluster_idxs, 'scores': scores}
         # #--------debug-------------
 
-        losses['adapted_weights_batch'] = adapted_weights_batch
+        # losses['adapted_weights_batch'] = adapted_weights_batch
         losses['medium_batch'] = medium_batch
 
         return losses, per_task_target_preds
@@ -2234,7 +2233,7 @@ def cal_IGD_loss(objs, refs):
 
     # non-dominated selection
     if type(objs) is torch.Tensor:
-        objs_np = objs.detach().cpu().numpy()
+        objs_np = objs.cpu().detach().numpy()
     else:
         objs_np = objs
     nds = NonDominatedSorting()
@@ -2294,7 +2293,7 @@ def cal_GD_loss(objs, refs):
 
     # non-dominated selection
     if type(objs) is torch.Tensor:
-        objs_np = objs.detach().cpu().numpy()
+        objs_np = objs.cpu().detach().numpy()
     else:
         objs_np = objs
     nds = NonDominatedSorting()
@@ -2405,7 +2404,7 @@ def cal_HV_loss(objs):
 
     # non-dominated selection
     if type(objs) is torch.Tensor:
-        objs_np = objs.detach().cpu().numpy()
+        objs_np = objs.cpu().detach().numpy()
     else:
         objs_np = objs
     nds = NonDominatedSorting()
@@ -2423,7 +2422,7 @@ def cal_HV_loss(objs):
 
     # update objs_np and objs to nd set.
     if type(objs) is torch.Tensor:
-        objs_np = objs.detach().cpu().numpy()
+        objs_np = objs.cpu().detach().numpy()
     else:
         objs_np = objs
 
@@ -2481,7 +2480,7 @@ def cal_HV_acc(objs):
 
     # non-dominated selection
     if type(objs) is torch.Tensor:
-        objs_np = objs.detach().cpu().numpy()
+        objs_np = objs.cpu().detach().numpy()
     else:
         objs_np = objs
     nds = NonDominatedSorting()

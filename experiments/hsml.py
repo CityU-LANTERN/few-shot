@@ -68,7 +68,7 @@ parser.add_argument('--eval-batches', default=5, type=int)
 parser.add_argument('--use-warm-start', action='store_true', help='true to load checkpoint')
 args = parser.parse_args()
 
-args.experiment_name = f'{args.experiment_name}_{args.seed}'
+args.experiment_name = f'{args.experiment_name}-{args.seed}'
 
 assert torch.cuda.is_available()
 device = torch.device('cuda')
@@ -140,7 +140,7 @@ evaluation_taskloader = DataLoader(
 print(f'Training HSML on {args.dataset}...')
 np.random.seed(seed=42)
 torch.manual_seed(seed=42)
-meta_model = HSML(args, device).to(device, dtype=torch.double)
+meta_model = HSML(args, device).to(device)  # , dtype=torch.double
 loss_fn = nn.CrossEntropyLoss().to(device)
 
 
@@ -153,12 +153,12 @@ def prepare_meta_batch(n, k, q, meta_batch_size, to_cuda=True):
         # Reshape to `meta_batch_size` number of tasks. Each task contains
         # n*k support samples to train the fast model on and q*k query samples to
         # evaluate the fast model on and generate meta-gradients
-        x = x.reshape(meta_batch_size, n*k + q*k, args.num_input_channels, x.shape[-2], x.shape[-1]).double()
+        x = x.reshape(meta_batch_size, n*k + q*k, args.num_input_channels, x.shape[-2], x.shape[-1]).float()
         y = y.reshape(meta_batch_size, n * k + q * k)
         # Create label
         yq = create_nshot_task_label(k, q).repeat(meta_batch_size).reshape(meta_batch_size, -1)
         if hasattr(args, "is_regression") and args.is_regression:
-            y = y.double()
+            y = y.float()
         else:
             y = y.long()
         if to_cuda:

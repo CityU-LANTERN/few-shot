@@ -327,7 +327,7 @@ class ReduceLROnPlateau(Callback):
     """
 
     def __init__(self, monitor='val_loss', factor=0.1, patience=10,
-                 verbose=0, mode='auto', min_delta=1e-4, cooldown=0, min_lr=0,
+                 verbose=1, mode='auto', min_delta=1e-4, cooldown=0, min_lr=0,
                  **kwargs):
         super(ReduceLROnPlateau, self).__init__()
 

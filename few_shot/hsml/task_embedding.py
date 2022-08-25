@@ -170,7 +170,7 @@ class LSTMAutoencoder(nn.Module):
         enc_inputs = torch.unsqueeze(inputs, dim=1)     # [NK, 1, 64+N]
         task_emb, enc_state = self.encoder(enc_inputs)
         # task_emb: [NK,1,128], enc_state: (num_layers, batch, hidden_size), [1,1,128]
-        dec_outputs = self.decoder(torch.zeros(enc_inputs[0].shape).double().to(inputs.device), enc_state[0],
+        dec_outputs = self.decoder(torch.zeros(enc_inputs[0].shape).float().to(inputs.device), enc_state[0],
                                    seq_len=inputs.shape[0])     # [1,NK,N+64]
         dec_outputs = dec_outputs.squeeze(0)    # [NK, N+64]
         loss_rec = self.loss_fn(inputs, dec_outputs)   # loss_rec: R
