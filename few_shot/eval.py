@@ -84,7 +84,7 @@ def evaluate_with_fn(model: Module, dataloader: DataLoader, prepare_batch: Calla
 
             # print(f'x: {x.shape}, y: {y.shape}')
 
-            y_pred = eval_fn(
+            _, y_pred = eval_fn(
                 model,
                 None,
                 loss_fn,

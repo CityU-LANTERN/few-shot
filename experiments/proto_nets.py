@@ -21,7 +21,6 @@ setup_dirs()
 # Parameters #
 ##############
 parser = argparse.ArgumentParser()
-parser.add_argument('--device', default=0)
 parser.add_argument('--dataset')
 parser.add_argument('--distance', default='l2')
 parser.add_argument('--n-train', default=1, type=int)
@@ -34,7 +33,6 @@ parser.add_argument('--q-test', default=1, type=int)
 args = parser.parse_args()
 
 assert torch.cuda.is_available()
-torch.cuda.set_device(int(args.device))
 device = torch.device('cuda')
 torch.backends.cudnn.benchmark = True
 

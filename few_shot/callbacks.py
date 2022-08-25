@@ -126,14 +126,16 @@ class DefaultCallback(Callback):
     def on_epoch_begin(self, batch, logs=None):
         self.seen = 0
         self.totals = {}
-        self.metrics = ['loss'] + self.params['metrics']
+        self.metrics = ['loss'] + self.params['metrics']    # abandon, determined on total, see on_epoch_end below
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
-        batch_size = logs.get('size', 1) or 1
+        batch_size = logs.get('size', 1) or 1       # usually 1, since logs contain batch mean.
         self.seen += batch_size
 
         for k, v in logs.items():
+            if type(v) is list or type(v) is dict:
+                continue                   # do not record medium_batch and params, use MediumLogger
             if k in self.totals:
                 self.totals[k] += v * batch_size
             else:
@@ -141,6 +143,7 @@ class DefaultCallback(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         if logs is not None:
+            self.metrics = list(self.totals.keys())
             for k in self.metrics:
                 if k in self.totals:
                     # Make value available to next callbacks.
@@ -205,12 +208,12 @@ class CSVLogger(Callback):
             training). False: overwrite existing file,
     """
 
-    def __init__(self, filename, separator=',', append=False):
+    def __init__(self, filename, separator=',', append=False, keys=None):
         self.sep = separator
         self.filename = filename
         self.append = append
         self.writer = None
-        self.keys = None
+        self.keys = keys
         self.append_header = True
         self.file_flags = ''
         self._open_args = {'newline': '\n'}
@@ -242,7 +245,10 @@ class CSVLogger(Callback):
                 return k
 
         if self.keys is None:
-            self.keys = sorted(logs.keys())
+            keys_candidates = sorted(logs.keys())
+            self.keys = [key for key in keys_candidates if ('acc' in key or 'accuracy' in key or 'loss' in key)]
+            if self.params['verbose']:
+                print(f'{CSVLogger} keys: {self.keys}. ')
 
         if not self.writer:
             class CustomDialect(csv.excel):
@@ -527,3 +533,59 @@ class LearningRateScheduler(Callback):
             if self.verbose:
                 print('Epoch {:5d}: setting learning rate'
                       ' of group {} to {:.4e}.'.format(epoch, i, new_lr))
+
+
+class Seeder(Callback):
+    """Fix randomization for each epoch
+
+    # Arguments
+        seeds: seed list for each epoch
+        num_epochs: number of epochs to assign random seed
+        verbose: verbosity mode, 0 or 1.
+        mode: one of {all, np, torch}.
+            If `save_best_only=True`, the decision
+            to overwrite the current save file is made
+            based on either the maximization or the
+            minimization of the monitored quantity. For `val_acc`,
+            this should be `max`, for `val_loss` this should
+            be `min`, etc. In `auto` mode, the direction is
+            automatically inferred from the name of the monitored quantity.
+    """
+
+    def __init__(self, seed, num_epochs, mode='all', verbose=True):
+        """
+
+        :param seed: control seed for generating seeds
+        :param mode: option: {all, np, torch}
+        :param verbose:
+        """
+        super(Seeder, self).__init__()
+        self.control_seed = seed
+        self.num_epochs = num_epochs
+        self.verbose = verbose
+        rng = np.random.RandomState(seed=seed)
+        self.seeds = rng.randint(1, 999999, size=(num_epochs,))
+        if mode not in ['all', 'np', 'torch']:
+            raise ValueError('Mode must be one of (all, np, torch).')
+        self.mode = mode
+
+        if verbose:
+            print(f'{Seeder}: seed: {seed}, generate seeds for all epochs: \n{self.seeds}.')
+
+    def on_epoch_begin(self, epoch, logs=None):
+        """seed seed before sampling from dataloader
+
+        :param epoch:
+        :param logs:
+        :return:
+        """
+        index = epoch - 1
+        if self.mode in ['all', 'np']:
+            np.random.seed(seed=self.seeds[index])
+        if self.mode in ['all', 'torch']:
+            torch.manual_seed(seed=self.seeds[index])
+
+        # if self.verbose:
+        #     print(f'{Seeder}: manual seed {self.seeds[index]} for epoch {epoch}.')
+
+        # print('Seeder', 'np', np.random.randint(1, 100, size=1), 'torch', torch.randint(1, 100, size=(1,)))

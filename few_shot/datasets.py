@@ -114,13 +114,14 @@ class OmniglotDataset(Dataset):
             # Angelic.0.character01
 
             for f in files:
-                progress_bar.update(1)
-                images.append({
-                    'subset': subset,
-                    'alphabet': alphabet,
-                    'class_name': class_name,
-                    'filepath': os.path.join(root, f)
-                })
+                if f.endswith('.png'):
+                    progress_bar.update(1)
+                    images.append({
+                        'subset': subset,
+                        'alphabet': alphabet,
+                        'class_name': class_name,
+                        'filepath': os.path.join(root, f)
+                    })
             # filepath: //10.20.2.245/datasets/datasets/Omniglot_enriched/images_evaluation\\Angelic.0\\character01\\0965_01.png
 
         progress_bar.close()
@@ -213,12 +214,13 @@ class MiniImageNet(Dataset):
             # n01770081
 
             for f in files:
-                progress_bar.update(1)
-                images.append({
-                    'subset': subset,
-                    'class_name': class_name,
-                    'filepath': os.path.join(root, f)
-                })
+                if f.endswith('.jpg'):
+                    progress_bar.update(1)
+                    images.append({
+                        'subset': subset,
+                        'class_name': class_name,
+                        'filepath': os.path.join(root, f)
+                    })
             # filepath: //10.20.2.245/datasets/datasets/miniImageNet/images_evaluation\\n01770081\\00001098.jpg
 
         progress_bar.close()
@@ -226,7 +228,7 @@ class MiniImageNet(Dataset):
 
 
 class Meta(Dataset):
-    def __init__(self, subset, target):
+    def __init__(self, subset, target, preload=False):
         """Dataset class for regular train/val/test,
         background -> train
         evaluation -> test
@@ -234,15 +236,24 @@ class Meta(Dataset):
         # Arguments:
             subset: Whether the dataset represents the background or evaluation set
             target: which dataset to represent
+            preload: whether to load whole dataset into memory
         """
-        if subset not in ('background', 'evaluation'):
-            raise(ValueError, 'subset must be one of (background, evaluation)')
+        if subset not in ('background', 'evaluation', 'testing'):
+            raise(ValueError, 'subset must be one of (background, evaluation, testing)')
         # if target not in ('CUB_Bird', 'DTD_Texture', 'FGVC_Aircraft', 'FGVCx_Fungi'):
         #     raise(ValueError, 'target must be one of (CUB_Bird, DTD_Texture, FGVC_Aircraft, FGVCx_Fungi)')
         self.subset = subset
         self.target = target
+        self.preload = preload
 
-        self.df = pd.DataFrame(self.index_subset(self.subset, self.target))
+        # Setup transforms
+        self.transform = transforms.Compose([
+            transforms.Resize(84),
+            transforms.ToTensor(),      # ToTensor() will normalize to [0, 1]
+        ])
+
+        info_dict, self.memory = self.index_subset(self.subset, self.target, self.preload, self.transform)
+        self.df = pd.DataFrame(info_dict)
 
         # Index of dataframe has direct correspondence to item in dataset
         self.df = self.df.assign(id=self.df.index.values)
@@ -269,16 +280,13 @@ class Meta(Dataset):
         self.datasetid_to_class_id = self.df.to_dict()['class_id']          # {dict: 960}
         # {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, ...}
 
-        # Setup transforms
-        self.transform = transforms.Compose([
-            transforms.Resize(84),
-            transforms.ToTensor(),      # ToTensor() will normalize to [0, 1]
-        ])
-
     def __getitem__(self, item):
-        instance = Image.open(self.datasetid_to_filepath[item])     # JpegImageFile, 84x84
-        instance = self.transform(instance)                         # [3, 84, 84]
-        label = self.datasetid_to_class_id[item]                    # from 0 -> 16
+        if self.preload:
+            instance = self.memory[item]
+        else:
+            instance = Image.open(self.datasetid_to_filepath[item])     # JpegImageFile, 84x84
+            instance = self.transform(instance)                         # [3, 84, 84]
+        label = self.datasetid_to_class_id[item]                        # from 0 -> 16
         return instance, label
 
     def __len__(self):
@@ -288,8 +296,10 @@ class Meta(Dataset):
         return len(self.df['class_name'].unique())
 
     @staticmethod
-    def index_subset(subset, target):
+    def index_subset(subset, target, preload=False, transform=None):
         """Index a subset by looping through all of its files and recording relevant information.
+        if preload, store memory {Tensor: {num, 3, 84, 84}} and
+                          images {list: num) -> dict{'subset', 'class_name', 'filepath'} into npy file
 
         # Arguments
             subset: Name of the subset
@@ -299,19 +309,38 @@ class Meta(Dataset):
             miniImageNet dataset
         """
         images = []
+        memory = []
         print('Indexing {}...{}...'.format(target, subset))
+
         # Quick first pass to find total for tqdm bar
         subset_len = 0
 
         # determine target's path
-        folder_name = 'train' if subset == 'background' else 'test'
-        if target in ('CUB_Bird', 'DTD_Texture', 'FGVC_Aircraft', 'FGVCx_Fungi'):
-            target_path = DATA_PATH + '/meta-dataset/{}/{}'.format(target, folder_name)
-        elif target in ('clipart_84', 'infograph_84', 'painting_84', 'quickdraw_84', 'real_84', 'sketch_84'):
-            target_path = DATA_PATH + '/DomainNet/{}/{}'.format(target, folder_name)
+        if subset == 'background':
+            folder_name = 'train'
+        elif subset == 'evaluation':
+            folder_name = 'val'
         else:
-            target_path = DATA_PATH + '/{}/{}'.format(target, folder_name)
-        print('target_path: {}'.format(target_path))
+            folder_name = 'test'
+        if target in ('CUB_Bird', 'DTD_Texture', 'FGVC_Aircraft', 'FGVCx_Fungi'):
+            target_path_root = DATA_PATH + '/meta-dataset/{}'.format(target)
+        elif target in ('clipart_84', 'infograph_84', 'painting_84', 'quickdraw_84', 'real_84', 'sketch_84'):
+            target_path_root = DATA_PATH + '/DomainNet/{}'.format(target)
+        else:
+            target_path_root = DATA_PATH + '/{}'.format(target)
+
+        if preload:
+            if os.path.exists(target_path_root + '/{}_images_memory.npy'.format(folder_name)):
+                print('{}: load {}/{}_images_memory.npy'.format(Meta, target_path_root, folder_name))
+                data = torch.load(target_path_root + '/{}_images_memory.npy'.format(folder_name))
+                images = data['images']
+                memory = data['memory']
+                return images, memory
+            else:
+                print('{}: load images into memory.'.format(Meta))
+
+        target_path = target_path_root + '/{}'.format(folder_name)
+        print('{}: construct npy from target_path: {}'.format(Meta, target_path))
 
         for root, folders, files in os.walk(target_path):
             subset_len += len([f for f in files if f.endswith('.jpg') or f.endswith('.JPG')])
@@ -334,10 +363,25 @@ class Meta(Dataset):
                     'class_name': class_name,
                     'filepath': os.path.join(root, f)
                 })
-            # filepath: //10.20.2.245/datasets/datasets/meta-dataset/CUB_Bird/val\\014.Indigo_Bunting\\Indigo_Bunting_0001_12469.jpg
+                # filepath: //10.20.2.245/datasets/datasets/meta-dataset/CUB_Bird/val
+                #               \\014.Indigo_Bunting\\Indigo_Bunting_0001_12469.jpg
+
+                # load memory
+                if preload:
+                    instance = Image.open(os.path.join(root, f))     # JpegImageFile, 84x84
+                    instance = transform(instance)                   # [3, 84, 84]
+                    memory.append(instance)
 
         progress_bar.close()
-        return images
+
+        # store npy
+        if preload:
+            memory = torch.stack(memory)
+            print('{}: store {}/{}_images_memory.npy'.format(Meta, target_path_root, folder_name))
+            state = {'images': images, 'memory': memory}
+            torch.save(state, target_path_root + '/{}_images_memory.npy'.format(folder_name))
+
+        return images, memory
 
 
 class DummyDataset(Dataset):
@@ -388,36 +432,30 @@ class MultiDataset(Dataset):
         # 2  014.Indigo_Bunting              ...         2          0
         # 3  014.Indigo_Bunting              ...         3          0
         # 4  014.Indigo_Bunting              ...         4          0
+        # store origin dataset_id into column[origin_dataset_id] for each df
+        for idx, dataset in enumerate(dataset_list):
+            dataset.df['origin_dataset_id'] = idx
         self.df = pd.concat([dataset.df for dataset in dataset_list], keys=[dataset.target for dataset in dataset_list])
+        # store origin id into column[origin_id]
+        self.df.rename(columns={'id': 'origin_id'}, inplace=True)
+        # store origin class_id into column[origin_class_id]
+        self.df.rename(columns={'class_id': 'origin_class_id'}, inplace=True)
         # update id with offset
         self.df['id'] = range(len(self.df))
         # update class_id with datasetid_to_class_id
         self.df = self.df.assign(class_id=self.df['id'].apply(lambda c: self.datasetid_to_class_id[c]))
-        #               class_name   ...    id  class_id
-        # CIFAR100_84 0       crab   ...     0         0
-        #             1       crab   ...     1         0
-        #             2       crab   ...     2         0
-        #             3       crab   ...     3         0
-        #             4       crab   ...     4         0
+        #               class_name   ...    origin_id   origin_class_id origin_dataset_id   id  class_id
+        # CIFAR100_84/0       crab   ...            0                 0                 0    0         0
+        #            /1       crab   ...            1                 0                 0    1         0
+        #            /2       crab   ...            2                 0                 0    2         0
+        #            /3       crab   ...            3                 0                 0    3         0
+        #            /4       crab   ...            4                 0                 0    4         0
         # ...
-        # CIFAR10_84  0       bird   ...   100         1
-        #             1       bird   ...   101         1
+        # CIFAR10_84 /0       bird   ...            0                 0                 1 1000       100
+        #            /1       bird   ...            1                 0                 2 1001       100
 
-    def index_mapping(self, index) -> (int, int):
-        """
-        A mapping method to map index (in __getitem__ method) to the index in the corresponding dataset.
-
-        :param index:
-        :return: dataset_id, item
-        """
-        index_origin = index
-        for dataset_id, dataset in enumerate(self.dataset_list):
-            if index < len(dataset):
-                return dataset_id, index
-            else:
-                index = index - len(dataset)
-
-        raise(ValueError, f'index exceeds total number of instances, index {index_origin}')
+        self.datasetid_to_origin_id = list(self.df['origin_id'])
+        self.datasetid_to_origin_dataset_id = list(self.df['origin_dataset_id'])
 
     def label_mapping(self) -> Dict:
         """
@@ -439,9 +477,10 @@ class MultiDataset(Dataset):
         return datasetid_to_class_id
 
     def __getitem__(self, item):
-        dataset_id, index = self.index_mapping(item)
-        instance, true_label = self.dataset_list[dataset_id][index]     # true_label is the label in sub-dataset
-        label = self.datasetid_to_class_id[item]                    # int
+        # dataset_id, index = self.index_mapping(item)
+        dataset_id, index = self.datasetid_to_origin_dataset_id[item], self.datasetid_to_origin_id[item]
+        instance, true_label = self.dataset_list[dataset_id][index]     # true_label is the label(int) in sub-dataset
+        label = self.datasetid_to_class_id[item]                        # label is the label(int) with offset
         return instance, label
 
     def __len__(self):
@@ -450,10 +489,27 @@ class MultiDataset(Dataset):
     def num_classes(self):
         sum([dataset.num_classes() for dataset in self.dataset_list])
 
+    def index_mapping(self, index) -> (int, int):
+        """
+        A mapping method to map index (in __getitem__ method) to the index in the corresponding dataset.
+
+        :param index:
+        :return: dataset_id, item
+        """
+        index_origin = index
+        for dataset_id, dataset in enumerate(self.dataset_list):
+            if index < len(dataset):
+                return dataset_id, index
+            else:
+                index = index - len(dataset)
+
+        raise(ValueError, f'index exceeds total number of instances, index {index_origin}')
+
 
 if __name__ == "__main__":
     # debug on MultiDataset
-    evaluation = MultiDataset([Meta('evaluation', 'CUB_Bird'), Meta('evaluation', 'FGVC_Aircraft')])
+    evaluation = MultiDataset([Meta('evaluation', 'CUB_Bird', preload=True),
+                               Meta('evaluation', 'FGVC_Aircraft', preload=True)])
 
     print(evaluation[1000][0].shape, evaluation[1000][1])
     # Indexing CUB_Bird...evaluation...
@@ -468,5 +524,5 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
     plt.imshow(np.transpose(evaluation[0][0].numpy(), (1, 2, 0)))
     plt.show()
-    plt.imshow(np.transpose(evaluation[3000][0].numpy(), (1, 2, 0)))
+    plt.imshow(np.transpose(evaluation[1000][0].numpy(), (1, 2, 0)))
     plt.show()

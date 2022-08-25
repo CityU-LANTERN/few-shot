@@ -10,6 +10,7 @@ from typing import Callable, List, Union
 
 from few_shot.callbacks import DefaultCallback, ProgressBarLogger, CallbackList, Callback
 from few_shot.metrics import NAMED_METRICS
+from few_shot.core import create_nshot_task_label
 
 
 def gradient_step(model: Module, optimiser: Optimizer, loss_fn: Callable, x: torch.Tensor, y: torch.Tensor, **kwargs):
@@ -79,7 +80,7 @@ def fit(model: Module, optimiser: Optimizer, loss_fn: Callable, epochs: int, dat
         fit_function_kwargs: Keyword arguments to pass to `fit_function`
     """
     # Determine number of samples:
-    num_batches = len(dataloader)
+    num_batches = len(dataloader)   # epoch_len: num of batches in 1 epoch
     batch_size = dataloader.batch_size
 
     callbacks = CallbackList([DefaultCallback(), ] + (callbacks or []) + [ProgressBarLogger(), ])
@@ -99,8 +100,12 @@ def fit(model: Module, optimiser: Optimizer, loss_fn: Callable, epochs: int, dat
 
     callbacks.on_train_begin()
 
-    for epoch in range(1, epochs+1):
+    start_epoch = model.current_epoch+1 if hasattr(model, 'current_epoch') else 1
+    for epoch in range(start_epoch, epochs+1):
         callbacks.on_epoch_begin(epoch)
+
+        # import numpy as np
+        # print('np', np.random.randint(1, 100, size=1), 'torch', torch.randint(1, 100, size=(1,)))
 
         epoch_logs = {}
         for batch_index, batch in enumerate(dataloader):
@@ -110,11 +115,28 @@ def fit(model: Module, optimiser: Optimizer, loss_fn: Callable, epochs: int, dat
 
             x, y = prepare_batch(batch)
 
-            loss, y_pred = fit_function(model, optimiser, loss_fn, x, y, **fit_function_kwargs)
-            batch_logs['loss'] = loss.item()
+            loss, y_pred = fit_function(model, optimiser, loss_fn, x, y, epoch=epoch, **fit_function_kwargs)
+            if type(loss) is dict:
+                # contain train/comflict_loss, train/conflict_acc, and some medium_batch, adapted_weights_batch
+                batch_logs['loss'] = loss['total_loss'].item()
+                for key, value in loss.items():
+                    if type(value) is torch.Tensor:
+                        value = value.detach().cpu()
+                        if value.ndim == 0:
+                            value = value.item()
+                        else:
+                            value = value.numpy()
+                    batch_logs[key] = value
+            else:
+                batch_logs['loss'] = loss.item()
 
+            if type(y) is dict:
+                y = y['q_relative_labels']
             # Loops through all metrics
-            batch_logs = batch_metrics(model, y_pred, y, metrics, batch_logs)
+            batch_logs = batch_metrics(model,
+                                       y_pred.reshape(-1, y_pred.shape[-1]),
+                                       y.reshape(-1),
+                                       metrics, batch_logs)
 
             callbacks.on_batch_end(batch_index, batch_logs)
 

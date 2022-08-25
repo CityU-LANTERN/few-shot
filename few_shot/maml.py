@@ -19,6 +19,7 @@ def meta_gradient_step(model: Module,
                        loss_fn: Callable,
                        x: torch.Tensor,
                        y: torch.Tensor,
+                       epoch: int,
                        n_shot: int,
                        k_way: int,
                        q_queries: int,
@@ -26,9 +27,12 @@ def meta_gradient_step(model: Module,
                        inner_train_steps: int,
                        inner_lr: float,
                        train: bool,
-                       device: Union[str, torch.device]):
+                       device: Union[str, torch.device],
+                       backward: bool = True,
+                       adapted_weights_batch=None):
     """
     Perform a gradient step on a meta-learner.
+    if backward is False, return list of loss, but not mean loss.
 
     # Arguments
         model: Base model of the meta-learner being trained
@@ -50,25 +54,31 @@ def meta_gradient_step(model: Module,
     """
     data_shape = x.shape[2:]
     create_graph = (True if order == 2 else False) and train
+    y_sup = create_nshot_task_label(k_way, n_shot).to(device)
+    y_que = create_nshot_task_label(k_way, q_queries).to(device)
+    y_od1 = create_nshot_task_label(k_way, 1).to(device)
 
     task_gradients = []
     task_losses = []
     task_predictions = []
-    for meta_batch in x:
+    for task_id, meta_batch in enumerate(x):
         # By construction x is a 5D tensor of shape: (meta_batch_size, n*k + q*k, channels, width, height)
         # Hence when we iterate over the first  dimension we are iterating through the meta batches
         x_task_train = meta_batch[:n_shot * k_way]
         x_task_val = meta_batch[n_shot * k_way:]
 
-        # Create a fast model using the current meta model weights
-        fast_weights = OrderedDict(model.named_parameters())
+        if adapted_weights_batch is None:
+            # Create a fast model using the current meta model weights
+            fast_weights = OrderedDict(model.named_parameters())
+        else:
+            fast_weights = OrderedDict(adapted_weights_batch[task_id])
 
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            y = create_nshot_task_label(k_way, n_shot).to(device)
-            logits = model.functional_forward(x_task_train, fast_weights)
-            loss = loss_fn(logits, y)
+            # y = create_nshot_task_label(k_way, n_shot).to(device)
+            logits = model.functional_forward(x_task_train, fast_weights)       # [10,5]  [5-way*2-shot, 5-way]
+            loss = loss_fn(logits, y_sup)
             gradients = torch.autograd.grad(loss, fast_weights.values(), create_graph=create_graph)
 
             # Update weights manually
@@ -78,13 +88,13 @@ def meta_gradient_step(model: Module,
             )
 
         # Do a pass of the model on the validation data from the current task
-        y = create_nshot_task_label(k_way, q_queries).to(device)
-        logits = model.functional_forward(x_task_val, fast_weights)
-        loss = loss_fn(logits, y)
+        # y = create_nshot_task_label(k_way, q_queries).to(device)
+        logits = model.functional_forward(x_task_val, fast_weights)    # [15,5]  [5-way*3-quer, 5-way]
+        loss = loss_fn(logits, y_que)
         loss.backward(retain_graph=True)
 
         # Get post-update accuracies
-        y_pred = logits.softmax(dim=1)
+        y_pred = logits.softmax(dim=1)           # [15,5]  [5-way*3-quer, 5-way]
         task_predictions.append(y_pred)
 
         # Accumulate losses and gradients
@@ -107,25 +117,32 @@ def meta_gradient_step(model: Module,
             optimiser.zero_grad()
             # Dummy pass in order to create `loss` variable
             # Replace dummy gradients with mean task gradients using hooks
-            logits = model(torch.zeros((k_way, ) + data_shape).to(device, dtype=torch.double))
-            loss = loss_fn(logits, create_nshot_task_label(k_way, 1).to(device))
-            loss.backward()
-            optimiser.step()
+            logits = model(torch.zeros((k_way,) + data_shape).to(device, dtype=torch.double))
+            loss = loss_fn(logits, y_od1)
+            if backward:
+                loss.backward()
+                optimiser.step()
 
             for h in hooks:
                 h.remove()
 
-        return torch.stack(task_losses).mean(), torch.cat(task_predictions)
+        if backward:
+            return torch.stack(task_losses).mean(), torch.cat(task_predictions)
+        else:
+            return torch.stack(task_losses), torch.stack(task_predictions)
 
     elif order == 2:
-        model.train()
-        optimiser.zero_grad()
         meta_batch_loss = torch.stack(task_losses).mean()
 
-        if train:
+        if train and backward:
+            model.train()
+            optimiser.zero_grad()
             meta_batch_loss.backward()
             optimiser.step()
 
-        return meta_batch_loss, torch.cat(task_predictions)
+        if backward:
+            return meta_batch_loss, torch.cat(task_predictions)
+        else:
+            return torch.stack(task_losses), torch.stack(task_predictions)
     else:
         raise ValueError('Order must be either 1 or 2.')

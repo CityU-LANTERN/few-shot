@@ -75,7 +75,7 @@ def functional_conv_block(x: torch.Tensor, weights: torch.Tensor, biases: torch.
 ##########
 # Models #
 ##########
-def get_few_shot_encoder(num_input_channels=1) -> nn.Module:
+def get_few_shot_encoder(num_input_channels=1, number_filters=64) -> nn.Module:
     """Creates a few shot encoder as used in Matching and Prototypical Networks
 
     # Arguments:
@@ -83,16 +83,16 @@ def get_few_shot_encoder(num_input_channels=1) -> nn.Module:
             miniImageNet = 3
     """
     return nn.Sequential(
-        conv_block(num_input_channels, 64),
-        conv_block(64, 64),
-        conv_block(64, 64),
-        conv_block(64, 64),
+        conv_block(num_input_channels, number_filters),
+        conv_block(number_filters, number_filters),
+        conv_block(number_filters, number_filters),
+        conv_block(number_filters, number_filters),
         Flatten(),
     )
 
 
 class FewShotClassifier(nn.Module):
-    def __init__(self, num_input_channels: int, k_way: int, final_layer_size: int = 64):
+    def __init__(self, num_input_channels: int, k_way: int, final_layer_size: int = 64, number_filters: int = 64):
         """Creates a few shot classifier as used in MAML.
 
         This network should be identical to the one created by `get_few_shot_encoder` but with a
@@ -102,13 +102,13 @@ class FewShotClassifier(nn.Module):
             num_input_channels: Number of color channels the model expects input data to contain. Omniglot = 1,
                 miniImageNet = 3
             k_way: Number of classes the model will discriminate between
-            final_layer_size: 64 for Omniglot, 1600 for miniImageNet
+            final_layer_size: 64 for Omniglot, 1600 for miniImageNet     # 1600 for imgsize 84
         """
         super(FewShotClassifier, self).__init__()
-        self.conv1 = conv_block(num_input_channels, 64)
-        self.conv2 = conv_block(64, 64)
-        self.conv3 = conv_block(64, 64)
-        self.conv4 = conv_block(64, 64)
+        self.conv1 = conv_block(num_input_channels, number_filters)
+        self.conv2 = conv_block(number_filters, number_filters)
+        self.conv3 = conv_block(number_filters, number_filters)
+        self.conv4 = conv_block(number_filters, number_filters)
 
         self.logits = nn.Linear(final_layer_size, k_way)
 
@@ -266,3 +266,37 @@ class AttentionLSTM(nn.Module):
         h = h_hat + queries
 
         return h
+
+
+if __name__ == '__main__':
+
+    model = FewShotClassifier(num_input_channels=3, k_way=5, number_filters=48, final_layer_size=1200)
+    # FewShotClassifier(
+    #   (conv1): Sequential(
+    #     (0): Conv2d(3, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #     (1): BatchNorm2d(48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    #     (2): ReLU()
+    #     (3): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    #   )
+    #   (conv2): Sequential(
+    #     (0): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #     (1): BatchNorm2d(48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    #     (2): ReLU()
+    #     (3): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    #   )
+    #   (conv3): Sequential(
+    #     (0): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #     (1): BatchNorm2d(48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    #     (2): ReLU()
+    #     (3): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    #   )
+    #   (conv4): Sequential(
+    #     (0): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #     (1): BatchNorm2d(48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    #     (2): ReLU()
+    #     (3): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    #   )
+    #   (logits): Linear(in_features=1200, out_features=5, bias=True)
+    # )
+    print(model.obtain_final_layer_size(img_size=84))
+

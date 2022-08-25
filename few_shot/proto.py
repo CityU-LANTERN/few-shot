@@ -72,10 +72,7 @@ def proto_net_episode(model: Module,
         optimiser.step()
     else:
         pass
-    if train:
-        return loss, y_pred
-    else:
-        return y_pred
+    return loss, y_pred
 
 
 def compute_prototypes(support: torch.Tensor, k: int, n: int) -> torch.Tensor:

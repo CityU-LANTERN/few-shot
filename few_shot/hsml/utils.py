@@ -1,0 +1,138 @@
+"""
+some callbacks.
+"""
+from typing import List, Iterable, Callable, Tuple
+import numpy as np
+import torch
+import warnings
+import os
+
+from few_shot.callbacks import Callback
+
+
+class HSMLCheckpoint(Callback):
+    """Save the model after every epoch.
+
+    `filepath` can contain named formatting options, which will be filled the value of `epoch` and keys in `logs`
+    (passed in `on_epoch_end`).
+
+    For example: if `filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`, then the model checkpoints will be saved
+    with the epoch number and the validation loss in the filename.
+
+    load checkpoint on train begin
+
+    # Arguments
+        filepath: string, path to save the model file.
+        monitor: quantity to monitor.
+        verbose: verbosity mode, 0 or 1.
+        save_best_only: if `save_best_only=True`,
+            the latest best model according to
+            the quantity monitored will not be overwritten.
+        mode: one of {auto, min, max}.
+            If `save_best_only=True`, the decision
+            to overwrite the current save file is made
+            based on either the maximization or the
+            minimization of the monitored quantity. For `val_acc`,
+            this should be `max`, for `val_loss` this should
+            be `min`, etc. In `auto` mode, the direction is
+            automatically inferred from the name of the monitored quantity.
+        save_weights_only: if True, then only the model's weights will be
+            saved (`model.save_weights(filepath)`), else the full model
+            is saved (`model.save(filepath)`).
+        period: Interval (number of epochs) between checkpoints.
+    """
+
+    def __init__(self, filepath, monitor='val_loss', verbose=0, save_best_only=False, mode='auto', period=1, load=True):
+        super(HSMLCheckpoint, self).__init__()
+        self.monitor = monitor
+        self.verbose = verbose
+        self.filepath = filepath
+        self.save_best_only = save_best_only
+        self.period = period
+        self.epochs_since_last_save = 0
+        self.load = load
+
+        if mode not in ['auto', 'min', 'max']:
+            raise ValueError('Mode must be one of (auto, min, max).')
+
+        if mode == 'min':
+            self.monitor_op = np.less
+            self.best = np.Inf
+        elif mode == 'max':
+            self.monitor_op = np.greater
+            self.best = -np.Inf
+        else:
+            if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
+                self.monitor_op = np.greater
+                self.best = -np.Inf
+            else:
+                self.monitor_op = np.less
+
+        self.best = np.Inf
+
+    def on_train_begin(self, logs=None):
+        """ load checkpoint, update self.best
+            self.model is not None
+        :param logs:
+        :return:
+        """
+        if self.load and os.path.exists(self.filepath):
+            state = torch.load(self.filepath)
+            self.model.load_state_dict(state['network'])
+            self.model.pool = state['pool']
+            self.model.current_epoch = state['current_epoch']
+            # needed for deciding whether to use conflict loss and the start epoch
+            if self.monitor in state:
+                self.best = state[self.monitor]
+                # else use the current monitor and keep initial self.best
+            # ignore state['args']
+            if self.params['verbose']:
+                print(f'{HSMLCheckpoint} '
+                      f'load checkpoint from {self.filepath}, epoch start from {self.model.current_epoch}.')
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+
+        # things need to store
+        state = dict()
+        state['network'] = self.model.state_dict()
+        if 'val_medium_batch' in logs:
+            state['val_medium_batch'] = logs['val_medium_batch']
+        state['pool'] = self.model.pool
+        state['args'] = self.model.args
+        state['current_epoch'] = epoch
+        # since it starts from 0, the next start epoch is this.
+        state[self.monitor] = self.best
+
+        self.epochs_since_last_save += 1
+        if self.epochs_since_last_save >= self.period:
+            self.epochs_since_last_save = 0
+            filepath = self.filepath.format(epoch=epoch + 1, **logs)
+            '''
+            Option: store another [filename]_latest.pth file along with [filename]_[epoch].pth
+            '''
+            if self.save_best_only:
+                current = logs.get(self.monitor)
+                if current is None:
+                    warnings.warn('Can save best model only with %s available, '
+                                  'skipping.' % (self.monitor), RuntimeWarning)
+                else:
+                    if self.monitor_op(current, self.best):
+                        if self.verbose > 0:
+                            print('\nEpoch %05d: %s improved from %0.5f to %0.5f,'
+                                  ' saving model to %s'
+                                  % (epoch + 1, self.monitor, self.best,
+                                     current, filepath))
+                        self.best = current
+                        torch.save(state, filepath)
+                    else:
+                        if self.verbose > 0:
+                            print('\nEpoch %05d: %s did not improve from %0.5f' %
+                                  (epoch + 1, self.monitor, self.best))
+            else:
+                if self.verbose > 0:
+                    print('\nEpoch %05d: saving model to %s' % (epoch + 1, filepath))
+                torch.save(state, filepath)
+
+    def on_batch_end(self, batch, logs=None):       # if need to store training medium batch, it needs to store in self.
+        pass

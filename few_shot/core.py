@@ -47,12 +47,18 @@ class NShotTaskSampler(Sampler):
         self.q = q
         self.fixed_tasks = fixed_tasks
 
-        self.i_task = 0
+        self.i_task = 0     # count yielded tasks
 
     def __len__(self):
         return self.episodes_per_epoch
 
     def __iter__(self):
+        # print('np', np.random.randint(1, 100, size=1), 'torch', torch.randint(1, 100, size=(1,)))
+        # 这里np和torch的seed都是fix的
+
+        # print(self.dataset.df['class_id'].unique())
+        # print(np.random.choice(self.dataset.df['class_id'].unique(), size=self.k, replace=False))
+
         for _ in range(self.episodes_per_epoch):
             batch = []
 
@@ -141,6 +147,7 @@ class EvaluateFewShot(Callback):
                 self.loss_fn,
                 x,
                 y,
+                epoch,
                 n_shot=self.n_shot,
                 k_way=self.k_way,
                 q_queries=self.q_queries,
@@ -148,13 +155,47 @@ class EvaluateFewShot(Callback):
                 **self.kwargs
             )
 
+            if type(y) is dict:
+                y = y['q_relative_labels']
+            y = y.reshape(-1)
+            y_pred = y_pred.reshape(-1, self.k_way)
+            # y_pred [bs*k-way*q-quer, k-way]
             seen += y_pred.shape[0]
 
-            totals['loss'] += loss.item() * y_pred.shape[0]
+            if type(loss) is dict:      # contain loss, acc, and some medium_batch
+                # y_pred [bs, k-way*q-quer, k-way]
+
+                for k, v in loss.items():
+                    if type(v) in [list, dict]:  #medium_batch and params for hsml use
+                        if k in totals:
+                            totals[k].append(v)
+                        else:
+                            totals[k] = [v]
+                    elif type(v) is torch.Tensor and v.ndim == 0:
+                        if k in totals:
+                            totals[k] += v.item() * y_pred.shape[0]
+                        else:
+                            totals[k] = v.item() * y_pred.shape[0]
+                    else:
+                        if k in totals:
+                            totals[k] += v * y_pred.shape[0]
+                        else:
+                            totals[k] = v * y_pred.shape[0]
+
+            else:
+                totals['loss'] += loss.item() * y_pred.shape[0]
+
             totals[self.metric_name] += categorical_accuracy(y, y_pred) * y_pred.shape[0]
 
-        logs[self.prefix + 'loss'] = totals['loss'] / seen
-        logs[self.metric_name] = totals[self.metric_name] / seen
+        for k, v in totals.items():
+            if type(v) in [list, dict]:  # medium_batch and params for hsml use
+                logs[self.prefix + k] = totals[k]
+            elif k == self.metric_name:
+                logs[self.metric_name] = totals[self.metric_name] / seen  # val_1-shot_5-way_acc
+            else:
+                logs[self.prefix + k] = totals[k] / seen
+        # logs[self.prefix + 'loss'] = totals['loss'] / seen      # val_loss
+        # logs[self.metric_name] = totals[self.metric_name] / seen    # val_1-shot_5-way_acc
 
 
 def prepare_nshot_task(n: int, k: int, q: int) -> Callable:
