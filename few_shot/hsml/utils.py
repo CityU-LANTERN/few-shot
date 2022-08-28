@@ -136,3 +136,82 @@ class HSMLCheckpoint(Callback):
 
     def on_batch_end(self, batch, logs=None):       # if need to store training medium batch, it needs to store in self.
         pass
+
+
+def image_montage(X, imsize=None, maxw=10, minh=None):
+    """X can be a list of images, or a matrix of vectorized images.
+      Specify imsize when X is a matrix."""
+    tmp = []
+    numimgs = len(X)
+
+    # create a list of images (reshape if necessary)
+    for i in range(0, numimgs):
+        if imsize != None:
+            tmp.append(X[i].reshape(imsize))
+        else:
+            tmp.append(np.squeeze(X[i]))
+
+    # add blanks
+    if (numimgs > maxw) and (np.mod(numimgs, maxw) > 0):
+        leftover = maxw - np.mod(numimgs, maxw)
+        meanimg = 0.5 * (X[0].max() + X[0].min())
+        for i in range(0, leftover):
+            tmp.append(np.ones(tmp[0].shape) * meanimg)
+
+    # add blank line
+    if minh is not None and int(len(tmp) / maxw) < minh:
+        leftover = (minh - int(len(tmp) / maxw)) * maxw
+        meanimg = 0.5 * (X[0].max() + X[0].min())
+        for i in range(0, leftover):
+            tmp.append(np.ones(tmp[0].shape) * meanimg)
+
+    # make the montage
+    tmp2 = []
+    for i in range(0, len(tmp), maxw):
+        tmp2.append(np.hstack(tmp[i:i + maxw]))
+    montimg = np.vstack(tmp2)
+    return montimg
+
+
+def task_montage(task_batch):
+    # montage of the images in task
+    x_support_set, x_target_set, _, _ = task_batch
+    (b, n, k, c, h, w) = x_support_set.shape
+    images = torch.cat((x_support_set, x_target_set), dim=2)  # [batch, N, K+Q, c, w,h]
+    images = images.view(b, -1, c, h, w)
+    task_image_montage_list = []
+    for batch_id in range(b):
+        task_image = images[batch_id].permute(0, 2, 3, 1).numpy()
+        task_image_montage_list.append(image_montage(task_image))
+    return image_montage(task_image_montage_list)
+
+
+def pool_montage(pool, pool_size=16, pool_max_size=20):
+    # montage of the images in pool
+    queue_image_montage_list = []
+
+    if type(pool) is dict:
+        pool = pool['pool']
+
+    for q in pool:
+        image_batch = []
+        for item in q:
+            cl = item['class']
+            if len(cl) == 2:
+                x_support_set, x_target_set = cl
+            else:
+                x_support_set, x_target_set, _, _ = cl
+            (k, c, h, w) = x_support_set.shape
+            (t, _, _, _) = x_target_set.shape
+            images = torch.cat((x_support_set, x_target_set), dim=0).permute(0, 2, 3, 1).numpy()  # [K+Q, w, h, c]
+            image_batch.append(images)
+        if len(image_batch) > 0:
+            image_batch = np.concatenate(image_batch, axis=0)   # [(K+Q), w, h, c]
+        else:
+            image_batch = np.zeros((pool_max_size * 2 * (k + t), h, w, c))
+        queue_image_montage_list.append(
+            image_montage(image_batch,
+                          maxw=int((k + t)/2),                      # 8
+                          minh=pool_max_size * 2))        # 10*2
+
+    return image_montage(queue_image_montage_list, maxw=pool_size)

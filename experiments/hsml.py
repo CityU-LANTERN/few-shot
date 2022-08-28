@@ -3,9 +3,10 @@ from torch.utils.data import DataLoader
 from torch import nn
 import torch
 import argparse
+import platform
 
 from few_shot.datasets import OmniglotDataset, MiniImageNet, MultiDataset, Meta
-from few_shot.core import NShotTaskSampler, create_nshot_task_label, EvaluateFewShot
+from few_shot.core import NShotTaskSamplerMultiDomain, create_nshot_task_label, EvaluateFewShot
 from few_shot.hsml.hsml import HSML
 from few_shot.hsml.utils import HSMLCheckpoint
 from few_shot.train import fit
@@ -83,6 +84,17 @@ if args.dataset == 'BTAF':
     args.image_height = 84
     args.image_width = 84
     dataset_class = MultiDataset
+elif args.dataset == 'meta':
+    args.dataset_name = [
+        "meta_CUB_Bird", "meta_FGVC_Aircraft", "meta_DTD_Texture", "meta_FGVCx_Fungi",
+        "Omniglot_84", "VGG_Flower_84", "mini_84", "quickdraw_84"]
+    args.is_regression = False
+    args.final_layer_size = 1200
+    args.number_filters = 48
+    args.num_input_channels = 3
+    args.image_height = 84
+    args.image_width = 84
+    dataset_class = MultiDataset
 elif args.dataset == 'miniImageNet':
     args.dataset_name = ["MiniImageNet"]
     args.is_regression = False
@@ -102,19 +114,31 @@ print(args)
 ###################
 preload = True
 num_workers = 8     # 8
+if platform.system() == 'Windows':
+    num_workers = 0
 if args.dataset == 'BTAF':
     background = dataset_class([Meta('background', 'CUB_Bird', preload=preload),
                                 Meta('background', 'DTD_Texture', preload=preload),
                                 Meta('background', 'FGVC_Aircraft', preload=preload),
                                 Meta('background', 'FGVCx_Fungi', preload=preload)])
+elif args.dataset == 'meta':
+    background = dataset_class([Meta('background', 'CUB_Bird', preload=preload),
+                                Meta('background', 'DTD_Texture', preload=preload),
+                                Meta('background', 'FGVC_Aircraft', preload=preload),
+                                Meta('background', 'FGVCx_Fungi', preload=preload),
+                                Meta('background', 'Omniglot_84', preload=preload),
+                                Meta('background', 'VGG_Flower_84', preload=preload),
+                                Meta('background', 'mini_84', preload=preload),
+                                Meta('background', 'quickdraw_84', preload=preload)
+                                ])
 else:
     background = dataset_class('background')
 background_taskloader = DataLoader(
     background,
-    batch_sampler=NShotTaskSampler(background, args.epoch_len,
-                                   n=args.num_samples_per_class, k=args.num_classes_per_set,
-                                   q=args.num_target_samples,
-                                   num_tasks=args.batch_size),
+    batch_sampler=NShotTaskSamplerMultiDomain(background, args.epoch_len,
+                                              n=args.num_samples_per_class, k=args.num_classes_per_set,
+                                              q=args.num_target_samples,
+                                              num_tasks=args.batch_size),
     num_workers=num_workers
 )
 
@@ -123,14 +147,24 @@ if args.dataset == 'BTAF':
                                 Meta('evaluation', 'DTD_Texture', preload=preload),
                                 Meta('evaluation', 'FGVC_Aircraft', preload=preload),
                                 Meta('evaluation', 'FGVCx_Fungi', preload=preload)])
+elif args.dataset == 'meta':
+    evaluation = dataset_class([Meta('evaluation', 'CUB_Bird', preload=preload),
+                                Meta('evaluation', 'DTD_Texture', preload=preload),
+                                Meta('evaluation', 'FGVC_Aircraft', preload=preload),
+                                Meta('evaluation', 'FGVCx_Fungi', preload=preload),
+                                Meta('evaluation', 'Omniglot_84', preload=preload),
+                                Meta('evaluation', 'VGG_Flower_84', preload=preload),
+                                Meta('evaluation', 'mini_84', preload=preload),
+                                Meta('evaluation', 'quickdraw_84', preload=preload)
+                                ])
 else:
     evaluation = dataset_class('evaluation')
 evaluation_taskloader = DataLoader(
     evaluation,
-    batch_sampler=NShotTaskSampler(evaluation, args.eval_batches,
-                                   n=args.num_samples_per_class, k=args.num_classes_per_set,
-                                   q=args.num_target_samples,
-                                   num_tasks=args.batch_size),
+    batch_sampler=NShotTaskSamplerMultiDomain(evaluation, args.eval_batches,
+                                              n=args.num_samples_per_class, k=args.num_classes_per_set,
+                                              q=args.num_target_samples,
+                                              num_tasks=args.batch_size),
     num_workers=num_workers
 )
 

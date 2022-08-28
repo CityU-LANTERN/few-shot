@@ -78,36 +78,38 @@ def evaluate_with_fn(model: Module, dataloader: DataLoader, prepare_batch: Calla
     if loss_fn is not None:
         totals['loss'] = 0
     model.eval()
-    with torch.no_grad():
-        for batch in dataloader:
-            x, y = prepare_batch(batch)
+    for batch in dataloader:
+        x, y = prepare_batch(batch)
 
-            # print(f'x: {x.shape}, y: {y.shape}')
+        # print(f'x: {x.shape}, y: {y.shape}')
 
-            _, y_pred = eval_fn(
-                model,
-                None,
-                loss_fn,
-                x,
-                y,
-                train=False,
-                **eval_function_kwargs
-            )
-            # y_pred = model(x)
+        _, y_pred = eval_fn(
+            model,
+            None,
+            loss_fn,
+            x,
+            y,
+            train=False,
+            **eval_function_kwargs
+        )
+        # y_pred = model(x)
+        if type(y) is dict:
+            y = y['q_relative_labels']
+        y = y.reshape(-1).cuda()
+        y_pred = y_pred.reshape(-1, y_pred.shape[-1]).cuda()
+        seen += x.shape[0]
 
-            seen += x.shape[0]
+        if loss_fn is not None:
+            totals['loss'] += loss_fn(y_pred, y).item() * x.shape[0]
 
-            if loss_fn is not None:
-                totals['loss'] += loss_fn(y_pred, y).item() * x.shape[0]
+        for m in metrics:
+            if isinstance(m, str):
+                v = NAMED_METRICS[m](y, y_pred)
+            else:
+                # Assume metric is a callable function
+                v = m(y, y_pred)
 
-            for m in metrics:
-                if isinstance(m, str):
-                    v = NAMED_METRICS[m](y, y_pred)
-                else:
-                    # Assume metric is a callable function
-                    v = m(y, y_pred)
-
-                totals[m] += v * x.shape[0]
+            totals[m] += v * x.shape[0]
 
     for m in ['loss'] + metrics:
         logs[prefix + m + suffix] = totals[m] / seen

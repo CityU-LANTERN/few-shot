@@ -1441,7 +1441,7 @@ class HSML(nn.Module):
 
             for adapted_weights in adapted_weights_batch:
                 for key, item in adapted_weights.items():
-                    item.requires_grad = True
+                    item.requires_grad_(True)
 
             # losses, per_task_target_preds = self.taskSpecificNet.maml_module.evaluation_forward_val_prop(
             #     data_batch, epoch, adapted_weights_batch)

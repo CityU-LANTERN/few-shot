@@ -4,9 +4,10 @@ Reproduce Model-agnostic Meta-learning results (supervised only) of Finn et al
 from torch.utils.data import DataLoader
 from torch import nn
 import argparse
+import platform
 
 from few_shot.datasets import OmniglotDataset, MiniImageNet, MultiDataset, Meta
-from few_shot.core import NShotTaskSampler, create_nshot_task_label, EvaluateFewShot
+from few_shot.core import NShotTaskSamplerMultiDomain, create_nshot_task_label, EvaluateFewShot
 from few_shot.maml import meta_gradient_step
 from few_shot.models import FewShotClassifier
 from few_shot.train import fit
@@ -70,6 +71,8 @@ print(param_str)
 ###################
 preload = True
 num_workers = 8     # 8
+if platform.system() == 'Windows':
+    num_workers = 0
 if args.dataset == 'BTAF':
     background = dataset_class([Meta('background', 'CUB_Bird', preload=preload),
                                 Meta('background', 'DTD_Texture', preload=preload),
@@ -79,7 +82,7 @@ else:
     background = dataset_class('background')
 background_taskloader = DataLoader(
     background,
-    batch_sampler=NShotTaskSampler(background, args.epoch_len, n=args.n, k=args.k, q=args.q,
+    batch_sampler=NShotTaskSamplerMultiDomain(background, args.epoch_len, n=args.n, k=args.k, q=args.q,
                                    num_tasks=args.meta_batch_size),
     num_workers=num_workers
 )
@@ -93,7 +96,7 @@ else:
     evaluation = dataset_class('evaluation')
 evaluation_taskloader = DataLoader(
     evaluation,
-    batch_sampler=NShotTaskSampler(evaluation, args.eval_batches, n=args.n, k=args.k, q=args.q,
+    batch_sampler=NShotTaskSamplerMultiDomain(evaluation, args.eval_batches, n=args.n, k=args.k, q=args.q,
                                    num_tasks=args.meta_batch_size),
     num_workers=num_workers
 )

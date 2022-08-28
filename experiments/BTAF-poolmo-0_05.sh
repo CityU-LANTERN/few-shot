@@ -6,12 +6,13 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 
 # 5-way 1-shot
 # hsml
-experiment_name="BTAF-hsml-pool"
+experiment_name="BTAF-poolmo-0_05"
 seed=10
 way=5
 shot=1
 quey=15
 innerlr=0.01
+HVw=0.05
 
 # train
 python -m experiments.hsml --experiment-name $experiment_name --seed $seed --dataset BTAF --use-warm-start \
@@ -20,6 +21,7 @@ python -m experiments.hsml --experiment-name $experiment_name --seed $seed --dat
     --meta-learning-rate 0.0001 --inner-learning-rate $innerlr \
     --epochs 50 --epoch-len 2000 --eval-batches 80 \
     --use-pool --pool-start-epoch 2 \
+    --use-conflict-loss --HV-weight $HVw \
     > ../few-shot-experiments/out/$experiment_name.out 2>&1
 
 # test
@@ -31,5 +33,5 @@ python -m experiments.hsml_test --experiment-name $experiment_name --seed $seed 
     --num-classes-per-set $way --num-samples-per-class $shot --num-target-samples $quey \
     --inner-val-steps 15 --order 2 \
     --inner-learning-rate $innerlr \
-    >> ../few-shot-experiments/out/$experiment_name.out 2>&1
+     >> ../few-shot-experiments/out/$experiment_name.out 2>&1
 done
