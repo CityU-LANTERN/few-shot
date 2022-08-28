@@ -6,19 +6,20 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 
 # 5-way 1-shot
 # hsml
-experiment_name="BTAF-hsml"
+experiment_name="BTAF-hsml--inlr0_001-melr0_00001"
 seed=10
 way=5
 shot=1
 quey=15
-innerlr=0.01
+innerlr=0.001
 
 # train
-#python -m experiments.hsml --experiment-name $experiment_name --seed $seed --dataset BTAF --use-warm-start \
-#    --num-classes-per-set $way --num-samples-per-class $shot --num-target-samples $quey --batch-size 4 \
-#    --inner-train-steps 3 --inner-val-steps 15 --order 2 \
-#    --meta-learning-rate 0.0001 --inner-learning-rate $innerlr \
-#    --epochs 50 --epoch-len 2000 --eval-batches 80 \
+python -m experiments.hsml --experiment-name $experiment_name --seed $seed --dataset BTAF --use-warm-start \
+    --num-classes-per-set $way --num-samples-per-class $shot --num-target-samples $quey --batch-size 4 \
+    --inner-train-steps 5 --inner-val-steps 15 --order 2 \
+    --meta-learning-rate 0.00001 --inner-learning-rate $innerlr \
+    --epochs 30 --epoch-len 5000 --eval-batches 80 \
+    > ../few-shot-experiments/out/$experiment_name.out 2>&1
 
 # test
 datasets="Omniglot_84 FGVC_Aircraft CUB_Bird DTD_Texture FGVCx_Fungi VGG_Flower_84 traffic_sign_84 mscoco_84 mini_84

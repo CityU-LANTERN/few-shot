@@ -105,7 +105,10 @@ evaluation_taskloader = DataLoader(
 # Model #
 #########
 print(f'Testing HSML on {args.test_dataset}...')
-filepath = PATH + f'/models/hsml/{args.experiment_name}.pth'
+if os.path.exists(PATH + f'/models/hsml/{args.experiment_name}-best.pth'):
+    filepath = PATH + f'/models/hsml/{args.experiment_name}-best.pth'
+else:
+    filepath = PATH + f'/models/hsml/{args.experiment_name}.pth'
 state = torch.load(filepath)
 model = HSML(args, device).to(device)  # , dtype=torch.double
 model.load_state_dict(state['network'])

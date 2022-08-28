@@ -225,9 +225,9 @@ if not debug:
             medium_record=True,     # False when run
         ),
         HSMLCheckpoint(
-            filepath=PATH + f'/models/hsml/{args.experiment_name}.pth',
+            filepath=PATH + '/models/hsml/' + args.experiment_name + '-{epoch}.pth',
             monitor=f'val_{args.num_samples_per_class}-shot_{args.num_classes_per_set}-way_acc',
-            verbose=0, save_best_only=False, load=args.use_warm_start
+            verbose=True, save_best=True, load=args.use_warm_start
         ),
         ReduceLROnPlateau(patience=10, factor=0.5, monitor=f'val_loss'),
         # it may influence warm start. and will introduce 'lr' key in epoch_logs.

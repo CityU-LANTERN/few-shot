@@ -42,12 +42,12 @@ class HSMLCheckpoint(Callback):
         period: Interval (number of epochs) between checkpoints.
     """
 
-    def __init__(self, filepath, monitor='val_loss', verbose=0, save_best_only=False, mode='auto', period=1, load=True):
+    def __init__(self, filepath, monitor='val_loss', verbose=0, save_best=False, mode='auto', period=1, load=True):
         super(HSMLCheckpoint, self).__init__()
         self.monitor = monitor
         self.verbose = verbose
         self.filepath = filepath
-        self.save_best_only = save_best_only
+        self.save_best = save_best
         self.period = period
         self.epochs_since_last_save = 0
         self.load = load
@@ -67,8 +67,7 @@ class HSMLCheckpoint(Callback):
                 self.best = -np.Inf
             else:
                 self.monitor_op = np.less
-
-        self.best = np.Inf
+                self.best = np.Inf
 
     def on_train_begin(self, logs=None):
         """ load checkpoint, update self.best
@@ -102,16 +101,16 @@ class HSMLCheckpoint(Callback):
         state['args'] = self.model.args
         state['current_epoch'] = epoch
         # since it starts from 0, the next start epoch is this.
-        state[self.monitor] = self.best
+        state[self.monitor] = logs.get(self.monitor)
 
         self.epochs_since_last_save += 1
         if self.epochs_since_last_save >= self.period:
             self.epochs_since_last_save = 0
-            filepath = self.filepath.format(epoch=epoch + 1, **logs)
             '''
             Option: store another [filename]_latest.pth file along with [filename]_[epoch].pth
             '''
-            if self.save_best_only:
+            if self.save_best:
+                filepath = self.filepath.format(epoch='best', **logs)
                 current = logs.get(self.monitor)
                 if current is None:
                     warnings.warn('Can save best model only with %s available, '
@@ -121,18 +120,19 @@ class HSMLCheckpoint(Callback):
                         if self.verbose > 0:
                             print('\nEpoch %05d: %s improved from %0.5f to %0.5f,'
                                   ' saving model to %s'
-                                  % (epoch + 1, self.monitor, self.best,
+                                  % (epoch, self.monitor, self.best,
                                      current, filepath))
                         self.best = current
-                        torch.save(state, filepath)
+                        torch.save(state, f'{filepath}')
                     else:
                         if self.verbose > 0:
-                            print('\nEpoch %05d: %s did not improve from %0.5f' %
-                                  (epoch + 1, self.monitor, self.best))
-            else:
-                if self.verbose > 0:
-                    print('\nEpoch %05d: saving model to %s' % (epoch + 1, filepath))
-                torch.save(state, filepath)
+                            print('\nEpoch %05d: %s:  %0.5f did not improve from %0.5f' %
+                                  (epoch, self.monitor, current, self.best))
+
+            filepath = self.filepath.format(epoch=epoch, **logs)
+            if self.verbose > 0:
+                print('\nEpoch %05d: saving model to %s' % (epoch, filepath))
+            torch.save(state, filepath)
 
     def on_batch_end(self, batch, logs=None):       # if need to store training medium batch, it needs to store in self.
         pass
